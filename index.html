@@ -34,6 +34,7 @@
       <div id="menu" class="menu hidden">
         <button data-action="export-layout">Save layout file (.json)</button>
         <button data-action="import-layout">Open layout file…</button>
+        <button data-action="plan-pdf">Print plan (.pdf)…</button>
         <button data-action="export-glb">Export 3D scene (.glb)</button>
         <button data-action="snapshot">Save picture (.png)</button>
         <hr />
@@ -250,6 +251,55 @@
       <ul id="garden-members" class="members"></ul>
       <div class="tool-row"><button id="account-signout" class="danger">Sign out</button></div>
     </section>
+  </dialog>
+
+  <dialog id="plan-dialog">
+    <form id="plan-form" method="dialog">
+      <div class="dlg-head">
+        <h2>Print a plan</h2>
+        <button class="icon" type="button" id="plan-close" title="Close">✕</button>
+      </div>
+      <p class="muted small">A scaled, north-up PDF plan with dimensions, plant and landscaping schedules and a title block. It's drawn from above, with your scan faded underneath. Set north with 🧭 first so the north arrow is right.</p>
+      <div class="form-grid">
+        <label class="wide">Project title <input name="title" type="text" placeholder="e.g. Smith back garden" /></label>
+        <label>Client <input name="client" type="text" /></label>
+        <label>Site address <input name="site" type="text" /></label>
+        <label>Designer / company <input name="designer" type="text" /></label>
+        <label>Date <input name="date" type="date" /></label>
+        <label>Revision <input name="revision" type="text" maxlength="12" /></label>
+        <label>Paper
+          <select name="paper"><option>A4</option><option selected>A3</option><option>A2</option><option>A1</option></select>
+        </label>
+        <label>Scale
+          <select name="scale">
+            <option value="auto">Best fit</option>
+            <option value="20">1:20</option><option value="25">1:25</option><option value="50">1:50</option>
+            <option value="75">1:75</option><option value="100">1:100</option><option value="125">1:125</option>
+            <option value="200">1:200</option><option value="250">1:250</option><option value="500">1:500</option>
+            <option value="1000">1:1000</option>
+          </select>
+        </label>
+        <label>Show
+          <select name="fit"><option value="design">The design</option><option value="scan">The whole scan</option></select>
+        </label>
+        <label>Background
+          <select name="underlay">
+            <option value="faded">Scan, faded (working drawing)</option>
+            <option value="render">Full colour from above (for clients)</option>
+            <option value="none">None (line drawing)</option>
+          </select>
+        </label>
+        <label class="wide">Notes <textarea name="notes" rows="2" placeholder="Optional, printed under the title"></textarea></label>
+      </div>
+      <div class="tool-row">
+        <label class="check"><input name="dims" type="checkbox" checked /> Dimensions</label>
+        <label class="check"><input name="view3d" type="checkbox" checked /> Add a 3D view sheet</label>
+      </div>
+      <div class="tool-row end">
+        <button type="button" id="plan-cancel">Cancel</button>
+        <button type="submit" class="primary">Make PDF</button>
+      </div>
+    </form>
   </dialog>
 
   <script type="module" src="js/main.js"></script>

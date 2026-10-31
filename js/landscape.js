@@ -191,7 +191,7 @@ export const WALLS = {
   stone: { name: 'Dry-stacked stone', t: 0.45, tile: 1.4, qty: (len, h) => `${(len * h * 0.45).toFixed(1)} m³ of stone` },
   gabion: { name: 'Gabion baskets', t: 0.5, tile: 1, qty: (len, h) => `${Math.ceil(len) * Math.ceil(h / 0.5)} baskets (1 m × 0.5 m)` },
   brickwall: { name: 'Brick', t: 0.23, tile: 0.96, qty: (len, h) => `${Math.ceil(len * h * 60 * 1.05)} bricks` },
-  corten: { name: 'Corten steel', t: 0.012, tile: 1.5, qty: (len) => `${Math.ceil(len / 2.4)} sheets (2.4 m)` },
+  corten: { name: 'Corten steel', t: 0.012, tile: 1.5, qty: (len) => { const n = Math.ceil(len / 2.4); return `${n} sheet${n === 1 ? '' : 's'} (2.4 m)`; } },
   paling: { name: 'Timber paling fence', t: 0.04, tile: 1.2, posts: 2.4, postColor: '#7a6346', centered: true, buried: 0.05, qty: (len, h) => `${Math.ceil(len / 0.15)} palings, ${Math.ceil(len / 2.4) + 1} posts, ${Math.ceil(len / 2.4) * 2} rails` },
 };
 

@@ -239,3 +239,14 @@ dialog p { line-height: 1.5; font-size: 14px; }
 @media (max-width: 760px) {
   .hint { flex-direction: column; gap: 6px; }
 }
+
+/* ---------- plan export ---------- */
+#plan-dialog { max-width: 620px; }
+.form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.form-grid .wide { grid-column: 1 / -1; }
+.form-grid select { margin-top: 4px; width: 100%; }
+#plan-dialog .tool-row label.check { flex: 0 0 auto; margin-right: 12px; }
+#plan-dialog .tool-row.end > button { flex: 0 0 auto; white-space: nowrap; }
+@media (max-width: 520px) {
+  .form-grid { grid-template-columns: 1fr; }
+}

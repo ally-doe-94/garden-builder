@@ -21,6 +21,7 @@ There's no build step and nothing to install. It's plain HTML, CSS and ES module
 - **Sun and shade**: the time-of-day slider moves the sun for your latitude and month, with real shadows. Use the 🧭 button to line up north with your scan.
 - **Mature spread circles** show how far each plant will reach, to help with spacing.
 - **Autosave**: the layout is kept in localStorage and the scan in IndexedDB, so your garden is still there when you come back. Back up or move to another device with *⋯ → Save layout file*.
+- **Print a plan** (*⋯ → Print plan*): a scaled, north-up PDF for clients and crews. See [Printed plans](#printed-plans).
 - **Export** a `.png` picture or the whole scene as a `.glb` (scan plus plants).
 - Works on desktop and on phones/tablets (touch to orbit, tap to plant).
 
@@ -40,6 +41,18 @@ Open the **Landscaping** tab to build hard landscaping into the garden:
 To finish, double-click, press <kbd>Enter</kbd> or tap **Finish**. For areas, you can also click the first corner again. Hold <kbd>Shift</kbd> to keep lines at 15° angles. Click a feature to change its material, width or height, drag its white dots to reshape it, or drag the feature to move it.
 
 Each feature shows its length or area, plus a rough shopping list: pavers or bricks (with spare), sleepers and posts, m³ of gravel or concrete, and step riser and tread sizes. Plants can be placed on top of paving, decks and beds. `tests/landscape.html` shows every tool on the demo garden.
+
+## Printed plans
+
+*⋯ → Print plan (.pdf)* makes a PDF drawn to scale from directly above, with north at the top:
+
+- **Sheet 1, the plan.** Your scan sits underneath, faded. Landscaping is drawn on top as vector shapes with real-size hatches (400 mm pavers, brick bond, 140 mm deck boards, gravel stipple). Each feature has a tag (L1, L2…). Plants are circles at their mature spread, numbered by species. Straight edges of paving, beds and walls get dimension lines. Curved walls and paths show their total length.
+- **Sidebar.** A landscaping schedule (size and materials to order for each feature), a plant schedule (quantity and mature height × width for each species), a north arrow, a scale bar and a title block (client, site, designer, date, revision, scale, sheet number). Long schedules continue on extra sheets.
+- **3D view sheet** (optional): the current camera view, month and growth.
+
+Options: A4 to A1 paper, a scale from 1:20 to 1:1000 (or *Best fit*), the design only or the whole scan, and a background of faded scan (a working drawing), full colour from above (for clients) or none (a line drawing). The title block details are remembered for next time.
+
+Set north with 🧭 before printing, so the plan and north arrow face the right way. jsPDF and the DejaVu Sans font load from the CDN the first time you print. The font is used so macrons (ā, ō) print correctly.
 
 ## Sharing with a partner
 
@@ -104,6 +117,7 @@ Scans are never uploaded anywhere. They stay in your own browser.
 | `js/sync.js` | Sign-in dialog and live syncing with your partner |
 | `js/landscape.js` | Landscaping materials, textures, shapes and quantities |
 | `js/landscapeEditor.js` | Drawing, selecting and reshaping landscaping |
+| `js/plan.js` | Printed PDF plan: top-down underlay, vector drawing, schedules, title block |
 | `supabase/schema.sql` | Database tables, access rules and storage setup |
 
 ### Adding a plant
