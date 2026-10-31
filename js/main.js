@@ -30,8 +30,10 @@ const state = {
 
 let persistTimer = null;
 let warnedStorage = false;
-let staleTab = false; // another tab saved newer changes; stop writing so we don't overwrite them
+let staleTab = false; // another tab saved newer changes; stop writing locally so we don't overwrite them
+let sync = null; // shared-garden sync, loaded after startup (see start())
 function persist() {
+  sync?.notifyChange();
   if (staleTab) return;
   clearTimeout(persistTimer);
   persistTimer = setTimeout(() => {
@@ -171,6 +173,7 @@ async function openScanFiles(files, { fromStorage = false } = {}) {
       } catch {
         toast(`Loaded ${loaded.name}, but it is too large to remember in this browser — you'll need to load it again next time.`, 7000);
       }
+      if (sync) await sync.shareScan(files);
     }
   } catch (err) {
     console.error(err);
@@ -811,11 +814,8 @@ $('menu').addEventListener('click', async (e) => {
     for (const id of [...plantObjects.keys()]) removePlant(id);
   }
   if (action === 'clear-scan' && state.scan && confirm('Remove the scan and go back to the demo garden? Your plants stay.')) {
-    await store.clearScanFiles().catch(() => {});
-    state.scan = null;
-    $('scan-panel').classList.add('hidden');
-    showDemo();
-    persist();
+    await clearScanLocal();
+    sync?.removeScan();
   }
 });
 
@@ -844,6 +844,76 @@ addEventListener('drop', async (e) => {
   }
   openScanFiles(files.map((f) => ({ name: f.name, blob: f })));
 });
+
+// ---------------------------------------------------------------------------
+// Shared garden (see sync.js)
+// ---------------------------------------------------------------------------
+
+async function clearScanLocal() {
+  await store.clearScanFiles().catch(() => {});
+  state.scan = null;
+  $('scan-panel').classList.add('hidden');
+  showDemo();
+  persist();
+}
+
+// A scan fetched from the shared garden: remember the files here and open them.
+async function adoptScan(files, scan) {
+  state.scan = { name: scan.name, cloudPrefix: scan.prefix, ...DEFAULT_SCAN, ...scan.transform };
+  await store.saveScanFiles(files).catch(() => {});
+  await openScanFiles(files, { fromStorage: true });
+}
+
+function applyTransform(t) {
+  if (!state.scan) return;
+  Object.assign(state.scan, t);
+  if (terrain && terrain !== demo) {
+    setScanLit(terrain, state.scan.lit);
+    setPointSize(terrain, state.scan.pointSize);
+  }
+  syncScanPanel();
+  refreshScan();
+}
+
+function syncSettingsUI() {
+  $('lat').value = state.settings.lat;
+  $('north').value = state.settings.north;
+  applySettings();
+  persist();
+}
+
+// A plant that was added or changed by your partner.
+function upsertRemotePlant(rec) {
+  const local = recordFor(rec.id);
+  if (!local) {
+    const added = { ...rec };
+    state.plants.push(added);
+    spawnPlant(added);
+    renderPlacedList();
+    persist();
+    return;
+  }
+  const obj = plantObjects.get(rec.id);
+  const beingDragged = transform.dragging && transform.object === obj;
+  const mine = { position: local.position, rotation: local.rotation };
+  Object.assign(local, rec);
+  if (beingDragged) Object.assign(local, mine);
+  obj.position.fromArray(local.position);
+  obj.rotation.y = local.rotation;
+  obj.scale.setScalar(local.size);
+  setPlantAge(obj, displayAge(local));
+  if (selectedId === rec.id) fillInspector();
+  persist();
+}
+
+const syncApi = {
+  state, toast, showLoading, hideLoading,
+  setLoadingText: (text) => { $('loading-text').textContent = text; },
+  removePlantLocal: (id) => removePlant(id),
+  upsertRemotePlant, adoptScan, clearScanLocal, applyTransform, syncSettingsUI,
+  getLocalScanFiles: () => store.loadScanFiles(),
+  saveLocal: () => store.saveState(state),
+};
 
 // ---------------------------------------------------------------------------
 // Little UI helpers
@@ -914,12 +984,24 @@ async function start() {
 
   for (const rec of state.plants) spawnPlant(rec);
   if (!saved) {
-    plantDemoExamples();
+    if (!hasAccount()) plantDemoExamples();
     showHint('Pick a plant on the left, then click in the garden to plant it');
     setTimeout(() => { if (!placing) hideHint(); }, 7000);
   }
   renderPlacedList();
   renderer.setAnimationLoop(animate);
+
+  // Loaded last and on its own: the planner keeps working offline or if sharing can't load.
+  try {
+    sync = (await import('./sync.js')).initSync(syncApi);
+  } catch (err) {
+    console.error('Sharing is unavailable', err);
+    $('btn-account').classList.add('hidden');
+  }
+}
+
+function hasAccount() {
+  try { return !!localStorage.getItem('garden-builder.auth'); } catch { return false; }
 }
 
 start();

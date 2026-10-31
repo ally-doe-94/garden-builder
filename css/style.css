@@ -201,3 +201,22 @@ dialog li { margin-bottom: 6px; }
   .slider { min-width: 40%; }
   .hint { top: 60px; white-space: normal; text-align: center; max-width: 90vw; border-radius: 12px; }
 }
+
+/* ---------- account / sharing ---------- */
+.top-actions > button.account { display: inline-flex; align-items: center; gap: 4px; }
+.account[data-status="synced"] .cloud { color: var(--accent); }
+.account[data-status="syncing"] .cloud { color: #ffd166; }
+.account[data-status="offline"] .cloud { color: var(--danger); }
+.dlg-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+dialog p { line-height: 1.5; font-size: 14px; }
+.garden-name { font-size: 18px; font-weight: 600; }
+.code-row { display: flex; align-items: center; gap: 8px; }
+.code-row code {
+  flex: 1; font-size: 22px; letter-spacing: 0.15em; padding: 8px 12px; border-radius: 8px;
+  background: rgba(0, 0, 0, 0.3); border: 1px solid var(--border); user-select: all;
+}
+.members { list-style: none; padding: 0; margin: 0; font-size: 14px; }
+.members li { padding: 4px 0; }
+@media (max-width: 760px) {
+  .account #account-label { display: none; }
+}

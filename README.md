@@ -19,6 +19,18 @@ There's no build step and nothing to install. It's plain HTML, CSS and ES module
 - **Export** a `.png` picture or the whole scene as a `.glb` (scan plus plants).
 - Works on desktop and on phones/tablets (touch to orbit, tap to plant).
 
+## Sharing with a partner
+
+Sign in (top right) to keep your scan and plants online and plan the garden together. Both of you use your own email and get a sign-in link, so there are no passwords. One of you creates the garden and gets an invite code. The other signs in and joins with that code.
+
+- The scan is uploaded once to private storage and downloaded automatically on your partner's device.
+- Plants, notes, compass direction and scan orientation sync live: when your partner plants something, it appears on your screen.
+- Growth, month and time sliders are yours alone, so you can each look at different seasons.
+- If you edit the same plant at the same moment, the last change wins.
+- Without signing in, everything still works and stays on your device.
+
+Backend: [Supabase](https://supabase.com) (sign-in, a small Postgres database, file storage and realtime). The database setup is in `supabase/schema.sql`. The URL and publishable key in `js/cloud.js` are meant to be public, because `schema.sql` restricts every table and the scan storage to the members of each garden.
+
 ## Scanning your garden
 
 1. Use a phone scanning app: **Polycam**, **Scaniverse**, **Luma AI**, **KIRI Engine** or **RealityScan**. LiDAR iPhones/iPads (Pro models) are quickest.
@@ -58,6 +70,9 @@ Scans are never uploaded anywhere. They stay in your own browser.
 | `js/scan.js` | Loading scans, auto-orientation, centring/grounding, fast raycasting |
 | `js/environment.js` | Sun position, sky, shadows, compass, demo garden |
 | `js/storage.js` | localStorage + IndexedDB persistence, downloads |
+| `js/cloud.js` | Supabase client: sign-in, gardens, plants, scan files |
+| `js/sync.js` | Sign-in dialog and live syncing with your partner |
+| `supabase/schema.sql` | Database tables, access rules and storage setup |
 
 ### Adding a plant
 

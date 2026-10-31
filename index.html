@@ -27,6 +27,7 @@
       </div>
     </div>
     <div class="top-actions">
+      <button id="btn-account" class="account" data-status="local" title="Sign in to share your garden"><span class="cloud">☁</span> <span id="account-label">Sign in</span></button>
       <button id="btn-load-scan" class="primary">Load scan</button>
       <button id="btn-help" title="How to scan your garden">How to scan</button>
       <button id="btn-menu" class="icon" title="More">⋯</button>
@@ -162,6 +163,49 @@
       </ul>
       <div class="tool-row end"><button class="primary" value="close">Got it</button></div>
     </form>
+  </dialog>
+
+  <dialog id="account-dialog">
+    <div class="dlg-head">
+      <h2>Share your garden</h2>
+      <button class="icon" id="account-close" title="Close">✕</button>
+    </div>
+
+    <section data-view="signed-out">
+      <p>Sign in to keep your scan and plants online, and to plan the garden together. You and your partner each use your own email. There's no password.</p>
+      <label>Email
+        <input id="auth-email" type="email" autocomplete="email" placeholder="you@example.com" />
+      </label>
+      <div class="tool-row"><button id="auth-send" class="primary">Email me a sign-in link</button></div>
+      <p id="auth-msg" class="muted small"></p>
+    </section>
+
+    <section data-view="no-garden" class="hidden">
+      <p class="muted small">Signed in as <strong id="no-garden-email"></strong></p>
+      <h3>Start a new shared garden</h3>
+      <label>Name
+        <input id="new-garden-name" type="text" value="Our garden" maxlength="60" />
+      </label>
+      <div class="tool-row"><button id="garden-create" class="primary">Create garden</button></div>
+      <p class="muted small">Your current plants and scan move into it. You'll get a code to give to your partner.</p>
+      <h3>Join your partner's garden</h3>
+      <label>Code from your partner
+        <input id="join-code" type="text" placeholder="e.g. 9F3A7C21" autocapitalize="characters" autocomplete="off" maxlength="16" />
+      </label>
+      <div class="tool-row"><button id="garden-join">Join garden</button></div>
+    </section>
+
+    <section data-view="garden" class="hidden">
+      <p class="muted small">Signed in as <strong id="account-email"></strong></p>
+      <h3>Garden</h3>
+      <p id="garden-name" class="garden-name"></p>
+      <h3>Invite code</h3>
+      <div class="code-row"><code id="garden-code"></code><button id="garden-copy">Copy</button></div>
+      <p class="muted small">Your partner signs in, chooses <em>Join your partner's garden</em> and enters this code. Keep it private.</p>
+      <h3>People</h3>
+      <ul id="garden-members" class="members"></ul>
+      <div class="tool-row"><button id="account-signout" class="danger">Sign out</button></div>
+    </section>
   </dialog>
 
   <script type="module" src="js/main.js"></script>
