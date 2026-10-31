@@ -28,6 +28,7 @@ const state = {
   features: saved?.features ?? [], // landscaping: paths, paving, walls, fences, steps (see landscape.js)
   settings: { ...DEFAULT_SETTINGS, ...saved?.settings },
   scan: saved?.scan ?? null, // transform settings for the loaded scan; files live in IndexedDB
+  plan: saved?.plan ?? {}, // last-used title block and options for the printed plan (see plan.js)
 };
 
 let persistTimer = null;
@@ -860,6 +861,115 @@ async function exportGLB() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Printed plan (PDF): see plan.js
+// ---------------------------------------------------------------------------
+
+// Render the scene with a given camera into a canvas of w × h pixels, without helpers or fog.
+// design: false hides plants and landscaping (the plan draws them as vectors on top).
+function renderToCanvas(cam, w, h, { design = true, pointPx = null, background = null } = {}) {
+  return withoutHelpers(() => {
+    const size = renderer.getSize(new THREE.Vector2());
+    const ratio = renderer.getPixelRatio();
+    const fog = scene.fog;
+    const sky = scene.background;
+    const hidden = design ? [] : [landscape.group, plantsGroup].filter((o) => o.visible);
+    const points = [];
+    if (pointPx && terrain) {
+      terrain.traverse((o) => {
+        if (o.isPoints && !o.userData.proxy) { points.push([o, o.material.size]); o.material.size = pointPx; }
+      });
+    }
+    hidden.forEach((o) => { o.visible = false; });
+    scene.fog = null;
+    if (background) scene.background = new THREE.Color(background);
+    try {
+      renderer.setPixelRatio(1);
+      renderer.setSize(w, h, false);
+      renderer.render(scene, cam);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(renderer.domElement, 0, 0);
+      return canvas;
+    } finally {
+      scene.fog = fog;
+      scene.background = sky;
+      hidden.forEach((o) => { o.visible = true; });
+      for (const [o, s] of points) o.material.size = s;
+      renderer.setPixelRatio(ratio);
+      renderer.setSize(size.x, size.y);
+    }
+  });
+}
+
+function openPlanDialog() {
+  const form = $('plan-form');
+  const values = { date: today(), revision: 'A', ...state.plan };
+  for (const el of form.elements) {
+    if (!el.name || !(el.name in values)) continue;
+    if (el.type === 'checkbox') el.checked = !!values[el.name];
+    else el.value = values[el.name];
+  }
+  $('plan-dialog').showModal();
+}
+
+async function makePlan() {
+  const form = $('plan-form');
+  const opts = {};
+  for (const el of form.elements) {
+    if (!el.name) continue;
+    opts[el.name] = el.type === 'checkbox' ? el.checked : el.value.trim();
+  }
+  state.plan = opts;
+  persist();
+  showLoading('Drawing your plan…');
+  await new Promise((r) => setTimeout(r, 30)); // let the spinner paint
+  try {
+    const { makePlanPDF } = await import('./plan.js');
+    const s = state.settings;
+    const yrs = s.years;
+    const result = await makePlanPDF({
+      features: state.features,
+      plants: state.plants,
+      northDeg: s.north,
+      terrainBox: terrain ? new THREE.Box3().setFromObject(terrain) : null,
+      pointSize: state.scan?.pointSize,
+      maxTexture: renderer.capabilities.maxTextureSize,
+      renderTopDown: renderToCanvas,
+      renderView: (w, h) => {
+        const aspect = camera.aspect;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        try {
+          return renderToCanvas(camera, w, h);
+        } finally {
+          camera.aspect = aspect;
+          camera.updateProjectionMatrix();
+        }
+      },
+      viewCaption: `${MONTHS[s.month - 1]}, ${yrs === 0 ? 'as planted today' : `${yrs} year${yrs > 1 ? 's' : ''} from now`}`,
+    }, opts);
+    const name = (opts.title || 'garden-plan').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').toLowerCase() || 'garden-plan';
+    store.downloadBlob(result.blob, `${name}-${today()}.pdf`);
+    toast(result.fits
+      ? `Plan saved: 1:${result.scale} on ${opts.paper}, ${result.sheets} sheet${result.sheets > 1 ? 's' : ''}.`
+      : `Plan saved, but the design doesn't all fit at 1:${result.scale}. Try Best fit or bigger paper.`, 6000);
+  } catch (err) {
+    console.error(err);
+    toast(`Couldn't make the plan: ${err.message || err}`, 6000);
+  } finally {
+    hideLoading();
+  }
+}
+
+$('plan-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  $('plan-dialog').close();
+  makePlan();
+});
+for (const id of ['plan-close', 'plan-cancel']) $(id).addEventListener('click', () => $('plan-dialog').close());
+
 $('btn-menu').addEventListener('click', (e) => {
   e.stopPropagation();
   $('menu').classList.toggle('hidden');
@@ -873,6 +983,7 @@ $('menu').addEventListener('click', async (e) => {
   $('menu').classList.add('hidden');
   if (action === 'export-layout') exportLayout();
   if (action === 'import-layout') $('file-layout').click();
+  if (action === 'plan-pdf') openPlanDialog();
   if (action === 'export-glb') exportGLB();
   if (action === 'snapshot') snapshot();
   if (action === 'clear-plants' && state.plants.length && confirm(`Remove all ${state.plants.length} plants?`)) {
