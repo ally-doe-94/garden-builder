@@ -8,7 +8,12 @@ There's no build step and nothing to install. It's plain HTML, CSS and ES module
 
 - **Load a 3D scan** of your garden: `.glb` / `.gltf` (textured mesh, the best option), `.ply` (mesh, point cloud or Gaussian splat), `.obj` (plus `.mtl` and textures if you drop them in together). Draco and Meshopt compressed GLBs work too.
 - **Fix the orientation**: PLY and OBJ scans are turned upright automatically. *Scan settings* lets you tilt, roll, rescale or raise/lower the ground.
-- **33 plants**, including a **New Zealand natives** collection (pōhutukawa, kōwhai, tī kōuka, nīkau, ponga, harakeke, mānuka, kawakawa, koromiko, kōhūhū, toetoe, taupata, horoeka, rengarenga, kāpuka) alongside trees, shrubs, flowers, foliage plants and a raised veg bed. Each has its mature size, sun needs and flowering time, and is modelled with bark, twigs, leafy canopies and petals.
+- **56 plants** in six groups:
+  - **NZ natives (25):** pōhutukawa, southern rātā, kōwhai, kauri, rimu, tōtara, kānuka, mānuka, tī kōuka, nīkau, ponga, harakeke, toetoe, pīngao, kākābeak, kawakawa, koromiko, kōhūhū, taupata, horoeka, rengarenga, Chatham Island forget-me-not, rautini, shrubby tororaro and a kāpuka hedge. Forms and flowering follow the [DOC native plants guide](https://www.doc.govt.nz/nature/native-plants/).
+  - **Edible (15):** lemon, feijoa, avocado, fig, plum, apple, blueberry, raspberry canes, strawberries, tomatoes, passionfruit trellis, kiwifruit pergola, rosemary, pumpkin patch and a raised veg bed.
+  - **Trees, shrubs, flowers and foliage plants:** the rest.
+
+  Each plant has its mature size, sun needs and flowering or fruiting time, and is modelled with bark, twigs, leafy canopies, petals and fruit.
 - **Plant by clicking**: pick a plant, then click (or tap) on the ground in the scan. Each copy gets a slightly different shape.
 - **Edit plants**: select a plant to move it (it stays on the ground), rotate it, resize it, duplicate or delete it, and add a planted date and notes.
 - **Growth slider**: see the garden today or up to 20 years ahead. Each plant's age comes from its planted date.

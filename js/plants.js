@@ -294,6 +294,60 @@ function frond(b, color, from, dir, length, { leaflets = 14, leafLen = 0.35, dro
   }
 }
 
+// Wiry, much-forked stems (mānuka, kānuka). Returns branch tips with their directions;
+// `tips.inner` holds the forks one level down, for foliage further along the branches.
+function forkingStems(b, color, { stems, length, radius, depth, spread = 0.35, rise = 0.3, bark = {} }) {
+  const { rng } = b;
+  const tips = [];
+  tips.inner = [];
+  const grow = (from, dir, len, r, level) => {
+    const to = from.clone().addScaledVector(dir, len);
+    b.add('trunk', color, barkGeo(from, to, r, r * 0.72, { seg: 5, rings: 3, crook: 0.14, rough: 0.28, seed: rng() * 99, ...bark }));
+    if (level === 0) { tips.push({ pos: to, dir }); return; }
+    if (level === 1) tips.inner.push({ pos: to, dir });
+    const forks = rng() < 0.35 ? 3 : 2;
+    for (let k = 0; k < forks; k++) {
+      const d = dir.clone().add(randomDir(rng).multiplyScalar(0.6));
+      d.y = Math.abs(d.y) + rise;
+      grow(to, d.normalize(), len * (0.6 + rng() * 0.15), r * 0.66, level - 1);
+    }
+  };
+  for (let i = 0; i < stems; i++) {
+    const a = (i / stems) * Math.PI * 2 + rng() * 0.8;
+    const dir = V(Math.cos(a) * spread, 1, Math.sin(a) * spread).normalize();
+    grow(V(Math.cos(a) * 0.06, 0, Math.sin(a) * 0.06), dir, length * (0.85 + rng() * 0.3), radius, depth);
+  }
+  return tips;
+}
+
+// A spray of fine-leaved foliage around a twig tip.
+function spray(b, colors, tip, size, count = 5) {
+  const { rng } = b;
+  const n = count + Math.floor(rng() * 3);
+  for (let k = 0; k < n; k++) {
+    const p = tip.pos.clone().addScaledVector(tip.dir, -size * rng() * 1.2).add(randomDir(rng).multiplyScalar(size * 0.7));
+    b.add('foliage', pick(rng, colors), xf(blob(rng, size * (0.45 + rng() * 0.3), { detail: 1, jitter: 0.35 }), p.x, p.y, p.z, rng(), rng() * 6, 0, 1, 0.7, 1), 0.2);
+  }
+}
+
+// Broad, flat leaves scattered through a volume (fig, kiwifruit, pumpkin, forget-me-not).
+function broadLeaves(b, colors, { cy, rx, ry, rz, n, size, x = 0, z = 0, tilt = 0.6 }) {
+  const { rng } = b;
+  for (let i = 0; i < n; i++) {
+    const p = inEllipsoid(rng, rx, ry, rz);
+    const leaf = blob(rng, size * (0.8 + rng() * 0.4), { detail: 1, jitter: 0.12 }).translate(0, 0, size * 0.6);
+    b.add('foliage', pick(rng, colors), xf(leaf, x + p.x, cy + p.y, z + p.z, -(rng() * tilt), rng() * Math.PI * 2, (rng() - 0.5) * 0.5, 1, 0.1, 1.15));
+  }
+}
+
+// Simple timber frame: posts plus horizontal wires/rails between them (trellis, pergola, cane rows).
+function post(b, x, z, h, w = 0.08) {
+  b.add('trunk', '#7a5c3e', xf(box(w, h, w), x, 0, z), 0.06);
+}
+function wire(b, from, to, r = 0.006, color = '#8a8a8a') {
+  b.add('trunk', color, limb(from, to, r, r, 3), 0.02);
+}
+
 // ---------------------------------------------------------------------------
 // Catalogue
 // ---------------------------------------------------------------------------
@@ -464,24 +518,25 @@ export const PLANTS = [
     },
   },
   {
-    id: 'manuka', name: 'Mānuka', latin: 'Leptospermum scoparium', emoji: '🤍', category: NZ,
-    height: 4, spread: 3, mature: 10, start: 0.25, sun: 'Full sun', type: 'NZ native shrub or small tree, honey plant',
-    winter: 'keep', bloom: ['spring', 'summer'], bloomText: 'Oct–Jan (white or pink)',
+    id: 'manuka', name: 'Mānuka / kahikātoa', latin: 'Leptospermum scoparium', emoji: '🤍', category: NZ,
+    height: 4, spread: 3, mature: 10, start: 0.25, sun: 'Full sun', type: 'NZ native tea tree: wiry stems, fine sharp-tipped leaves, flaky bark',
+    winter: 'keep', bloom: ['spring', 'summer'], fruit: ['autumn', 'winter'], bloomText: 'Oct–Jan (white or pink-flushed, dark red centres)',
     build(b) {
       const { rng } = b;
-      const bark = '#6e5b48';
-      for (let i = 0; i < 4; i++) {
-        const a = (i / 4) * Math.PI * 2 + rng();
-        const top = V(Math.cos(a) * 0.6, 2.4 + rng() * 0.5, Math.sin(a) * 0.6);
-        b.add('trunk', bark, barkGeo(V(Math.cos(a) * 0.06, 0, Math.sin(a) * 0.06), top, 0.07, 0.035, { seg: 6, crook: 0.12, rough: 0.25, seed: rng() * 99 }));
-        branch(b, bark, top.clone().multiplyScalar(0.8), top.clone().add(V(Math.cos(a) * 0.6, 0.6, Math.sin(a) * 0.6)), 0.035, 0.015, 2);
+      const tips = forkingStems(b, '#7d6450', { stems: 6, length: 1.3, radius: 0.055, depth: 3, spread: 0.45, rise: 0.15 });
+      const leaves = ['#566a38', '#4d6034', '#6b6a3c', '#5e6e3a'];
+      for (const node of tips.inner) {
+        spray(b, leaves, node, 0.22, 4);
+        flower(b, pick(rng, ['#fbfbf5', '#f6dde3']), '#6b1d24', node.pos.clone().add(randomDir(rng).multiplyScalar(0.18)), randomDir(rng).add(V(0, 0.8, 0)), 0.05);
       }
-      const cy = 2.8;
-      canopy(b, { cy, rx: 1.6, ry: 1.2, rz: 1.6, n: 30, r: 0.36, color: '#56693b', tufts: 1.8 });
-      const shell = { cy, rx: 1.6 * 0.7 + 0.3, ry: 1.2 * 0.7 + 0.3, rz: 1.6 * 0.7 + 0.3 };
-      for (let i = 0; i < 110; i++) {
-        const p = onEllipsoid(rng, shell.rx, shell.ry, shell.rz, -0.3);
-        flower(b, pick(rng, ['#fbfbf5', '#f6f2ea', '#f3d9e1']), '#8a6b3a', p.clone().add(V(0, cy, 0)), p.clone().normalize(), 0.06);
+      for (const tip of tips) {
+        spray(b, leaves, tip, 0.24, 4);
+        for (let k = 0; k < 3; k++) {
+          const p = tip.pos.clone().add(randomDir(rng).multiplyScalar(0.22));
+          flower(b, pick(rng, ['#fbfbf5', '#f7f3ee', '#f6dde3']), '#6b1d24', p, randomDir(rng).add(V(0, 0.9, 0)), 0.05);
+        }
+        const c = tip.pos.clone().addScaledVector(tip.dir, -0.3 - rng() * 0.25);
+        b.add('fruit', '#b9b2a4', xf(blob(rng, 0.02, { detail: 0 }), c.x, c.y, c.z));
       }
     },
   },
@@ -627,6 +682,215 @@ export const PLANTS = [
       for (let i = 0; i < 40; i++) {
         const p = V(rng() * 1.0 - 0.5, 0.15 + rng() * 1.55, (rng() < 0.5 ? -1 : 1) * (0.25 + rng() * 0.08));
         b.add('foliage', '#86b545', xf(blob(rng, 0.09, { detail: 1, jitter: 0.25 }), p.x, p.y, p.z), 0.2);
+      }
+    },
+  },
+
+  {
+    id: 'kanuka', name: 'Kānuka', latin: 'Kunzea ericoides', emoji: '🤍', category: NZ,
+    height: 8, spread: 4, mature: 15, start: 0.15, sun: 'Full sun', type: 'NZ native tree, stringy bark, soft fine foliage',
+    winter: 'keep', bloom: ['summer'], bloomText: 'Dec–Jan (clusters of small white flowers)',
+    build(b) {
+      const { rng } = b;
+      const tips = forkingStems(b, '#8a6f58', { stems: 2, length: 2.8, radius: 0.13, depth: 3, spread: 0.15, rise: 0.45, bark: { rough: 0.4 } });
+      for (const tip of tips) {
+        spray(b, ['#6f8a45', '#7a9450', '#668040'], tip, 0.42, 5);
+        dots(b, 'flower', ['#fbfbf5', '#f3f1e8'], { cy: tip.pos.y + 0.12, x: tip.pos.x, z: tip.pos.z, rx: 0.4, ry: 0.25, rz: 0.4, n: 12, r: 0.03, minY: -0.2 });
+      }
+    },
+  },
+  {
+    id: 'rata', name: 'Southern rātā', latin: 'Metrosideros umbellata', emoji: '🌺', category: NZ,
+    height: 8, spread: 6, mature: 40, start: 0.12, sun: 'Full sun / part shade', type: 'NZ native tree, close cousin of pōhutukawa',
+    winter: 'keep', bloom: ['summer'], bloomText: 'Dec–Feb (scarlet)',
+    build(b) {
+      const { rng } = b;
+      const bark = '#5e5248';
+      trunk(b, bark, 3.2, 0.3, 0.17, { crook: 0.08 });
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + rng();
+        branch(b, bark, V(0, 2.4 + rng() * 0.8, 0), V(Math.cos(a) * 1.9, 5 + rng(), Math.sin(a) * 1.9), 0.12, 0.05, 3);
+      }
+      const cy = 5.6;
+      canopy(b, { cy, rx: 2.8, ry: 2.1, rz: 2.8, n: 18, r: 0.95, color: '#2f5a2c', tufts: 1.8 });
+      dots(b, 'flower', ['#d0202f', '#e0303a', '#b8141f'], { cy, rx: 2.8 * 0.7 + 0.75, ry: 2.1 * 0.7 + 0.75, rz: 2.8 * 0.7 + 0.75, n: 170, r: 0.11, minY: -0.1, detail: 1 });
+    },
+  },
+  {
+    id: 'kakabeak', name: 'Kākābeak / ngutukākā', latin: 'Clianthus puniceus', emoji: '🦜', category: NZ,
+    height: 2, spread: 2.5, mature: 3, start: 0.35, sun: 'Full sun', type: 'Threatened NZ native shrub with claw-shaped flowers',
+    winter: 'keep', bloom: ['spring'], bloomText: 'Sep–Nov (red clusters of 15–20 hanging flowers)',
+    build(b) {
+      const { rng } = b;
+      mulch(b, 0.5);
+      const tips = [];
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + rng() * 0.4;
+        const end = V(Math.cos(a) * 1.1, 1.3 + rng() * 0.5, Math.sin(a) * 1.1);
+        b.add('trunk', '#5f6b3a', barkGeo(V(0, 0, 0), end, 0.035, 0.015, { seg: 5, rings: 4, crook: 0.2, rough: 0.05, seed: rng() * 99 }));
+        tips.push(end);
+        for (let k = 0; k < 4; k++) {
+          const p = V(0, 0, 0).lerp(end, 0.35 + k * 0.17);
+          frond(b, '#4e7a3a', p, randomDir(rng).add(V(0, 0.5, 0)), 0.45, { leaflets: 9, leafLen: 0.06, droop: 0.4 });
+        }
+      }
+      for (const end of tips) {
+        for (let k = 0; k < 16; k++) {
+          const p = end.clone().add(V((rng() - 0.5) * 0.3, -0.05 - rng() * 0.25, (rng() - 0.5) * 0.3));
+          const claw = xf(blob(rng, 0.025, { detail: 0, jitter: 0.1 }), 0, 0.05, 0, 0, 0, 0.5, 1, 3.2, 1);
+          b.add('flower', pick(rng, ['#c8102e', '#d42a3a']), placeAt(claw, p, V((rng() - 0.5) * 0.6, -1, (rng() - 0.5) * 0.6)));
+        }
+      }
+    },
+  },
+  {
+    id: 'kauri', name: 'Kauri (young)', latin: 'Agathis australis', emoji: '🌲', category: NZ,
+    height: 14, spread: 6, mature: 60, start: 0.08, sun: 'Full sun', type: 'NZ native giant: conical when young, can live 2,000 years',
+    winter: 'keep', bloom: [], bloomText: '—',
+    build(b) {
+      const { rng } = b;
+      trunk(b, '#a39d92', 11, 0.36, 0.14, { crook: 0.01 });
+      for (let i = 0; i < 30; i++) {
+        const y = 0.5 + rng() * 9;
+        const a = rng() * Math.PI * 2;
+        const r = 0.36 - (y / 11) * 0.2;
+        b.add('trunk', '#7d776d', xf(blob(rng, 0.09, { detail: 0, jitter: 0.2 }), Math.cos(a) * r, y, Math.sin(a) * r, 0, 0, 0, 1, 0.5, 1), 0.05);
+      }
+      for (let t = 0; t < 8; t++) {
+        const y = 4 + t * 1.15;
+        const reach = 2.7 * (1 - t / 9);
+        const n = 5;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + t * 0.7 + rng() * 0.3;
+          const end = V(Math.cos(a) * reach, y + 0.35, Math.sin(a) * reach);
+          branch(b, '#8f897e', V(0, y, 0), end, 0.07, 0.03, 1);
+          canopy(b, { cy: end.y, x: end.x * 0.8, z: end.z * 0.8, rx: reach * 0.35, ry: 0.35, rz: reach * 0.35, n: 3, r: 0.5, color: '#3f5a3a', squash: 0.6, tufts: 1.2 });
+        }
+      }
+      canopy(b, { cy: 13.3, rx: 0.5, ry: 0.6, rz: 0.5, n: 4, r: 0.4, color: '#3f5a3a' });
+    },
+  },
+  {
+    id: 'rimu', name: 'Rimu (young)', latin: 'Dacrydium cupressinum', emoji: '🌲', category: NZ,
+    height: 10, spread: 5, mature: 80, start: 0.08, sun: 'Part shade', type: 'NZ native podocarp, graceful weeping foliage when young',
+    winter: 'keep', bloom: [], bloomText: '—',
+    build(b) {
+      const { rng } = b;
+      trunk(b, '#6d4f3c', 8.5, 0.24, 0.08, { crook: 0.04 });
+      for (let t = 0; t < 9; t++) {
+        const y = 2.4 + t * 0.85;
+        const reach = 2.2 * (1 - t / 11);
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + t * 0.9 + rng() * 0.4;
+          const end = V(Math.cos(a) * reach, y + 0.5, Math.sin(a) * reach);
+          b.add('trunk', '#6d4f3c', limb(V(0, y, 0), end, 0.05, 0.02, 4));
+          for (let k = 0; k < 9; k++) {
+            const from = V(0, y, 0).lerp(end, 0.4 + rng() * 0.6);
+            blade(b, 'foliage', pick(rng, ['#6f7d3a', '#7f8a42', '#62723a']), from, V((rng() - 0.5) * 0.4, -1, (rng() - 0.5) * 0.4), 0.8 + rng() * 0.7, 0.03, { droop: 0.1, segs: 3, flat: 0.7 });
+          }
+        }
+      }
+    },
+  },
+  {
+    id: 'totara', name: 'Tōtara', latin: 'Podocarpus totara', emoji: '🌲', category: NZ,
+    height: 8, spread: 3.5, mature: 40, start: 0.12, sun: 'Sun or shade', type: 'NZ native podocarp, dense and hardy, good for hedging',
+    winter: 'keep', bloom: [], fruit: ['autumn'], bloomText: 'Red berry-like fruit in autumn',
+    build(b) {
+      const { rng } = b;
+      trunk(b, '#7a5a44', 2.2, 0.22, 0.14, { crook: 0.05 });
+      for (let i = 0; i < 12; i++) {
+        const y = 1.6 + i * 0.52;
+        const r = 1.7 * Math.sin(Math.PI * (0.15 + 0.85 * (1 - i / 12)) * 0.9) * (1 - i / 16);
+        for (let k = 0; k < 4; k++) {
+          const a = rng() * Math.PI * 2;
+          b.add('foliage', pick(rng, ['#4a5f35', '#55663a']), xf(blob(rng, 0.45 + r * 0.25, { detail: 2 }), Math.cos(a) * r * 0.55, y, Math.sin(a) * r * 0.55, 0, 0, 0, 1, 0.9, 1));
+        }
+      }
+      for (let i = 0; i < 60; i++) {
+        const p = onEllipsoid(rng, 1.55, 3.2, 1.55);
+        b.add('foliage', '#4f6236', xf(blob(rng, 0.12, { detail: 1, jitter: 0.35 }), p.x, 4.6 + p.y, p.z), 0.2);
+      }
+      dots(b, 'fruit', ['#c2272d', '#d63a2e'], { cy: 4.6, rx: 1.6, ry: 3.2, rz: 1.6, n: 40, r: 0.03, detail: 1 });
+    },
+  },
+  {
+    id: 'forgetmenot', name: 'Chatham Island forget-me-not', latin: 'Myosotidium hortensia', emoji: '💙', category: NZ,
+    height: 0.6, spread: 0.9, mature: 3, start: 0.4, sun: 'Part shade', type: 'NZ native perennial, huge glossy pleated leaves',
+    winter: 'keep', bloom: ['spring'], bloomText: 'Sep–Nov (blue with white edges)',
+    build(b) {
+      const { rng } = b;
+      mulch(b, 0.42);
+      for (let i = 0; i < 16; i++) {
+        const leaf = blob(rng, 0.17, { detail: 2, jitter: 0.08 }).translate(0, 0, 0.18);
+        const stalk = V(0, 0.02, 0);
+        b.add('foliage', pick(rng, ['#4f9045', '#5a9a50', '#468a3e']), xf(leaf, stalk.x, stalk.y, stalk.z, -(0.55 + rng() * 0.45), (i / 16) * Math.PI * 2 + rng() * 0.3, 0, 1, 0.1, 1.25));
+      }
+      for (let k = 0; k < 4; k++) {
+        const a = rng() * Math.PI * 2;
+        const top = V(Math.cos(a) * 0.15, 0.5 + rng() * 0.1, Math.sin(a) * 0.15);
+        b.add('flower', '#5a7a3a', limb(V(0, 0, 0), top, 0.012, 0.008, 4));
+        for (let j = 0; j < 22; j++) {
+          const p = onEllipsoid(rng, 0.11, 0.06, 0.11, 0).add(top);
+          flower(b, pick(rng, ['#2f5fd0', '#4a78de', '#2a54c0']), '#eef2fc', p, p.clone().sub(top).normalize(), 0.035, 5);
+        }
+      }
+    },
+  },
+  {
+    id: 'rautini', name: 'Rautini (Chatham Island Christmas tree)', latin: 'Brachyglottis huntii', emoji: '🌼', category: NZ,
+    height: 5, spread: 3, mature: 12, start: 0.2, sun: 'Full sun', type: 'Threatened NZ native tree daisy',
+    winter: 'keep', bloom: ['summer'], bloomText: 'Dec–Jan (bright yellow daisies)',
+    build(b) {
+      const { rng } = b;
+      trunk(b, '#6b5d4d', 1.6, 0.12, 0.07, { crook: 0.08 });
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + rng();
+        branch(b, '#6b5d4d', V(0, 1.2 + rng() * 0.3, 0), V(Math.cos(a) * 1.1, 2.7 + rng() * 0.5, Math.sin(a) * 1.1), 0.06, 0.025, 2);
+      }
+      const cy = 3.2;
+      canopy(b, { cy, rx: 1.6, ry: 1.3, rz: 1.6, n: 18, r: 0.48, color: '#9bb07a', tufts: 1.6 });
+      for (let i = 0; i < 170; i++) {
+        const p = onEllipsoid(rng, 1.6 * 0.7 + 0.45, 1.3 * 0.7 + 0.45, 1.6 * 0.7 + 0.45, -0.2);
+        flower(b, '#f2c318', '#c98a10', p.clone().add(V(0, cy, 0)), p.clone().normalize().add(V(0, 0.5, 0)), 0.1, 9);
+      }
+    },
+  },
+  {
+    id: 'tororaro', name: 'Shrubby tororaro', latin: 'Muehlenbeckia astonii', emoji: '🧶', category: NZ,
+    height: 2, spread: 2.5, mature: 6, start: 0.3, sun: 'Full sun', type: 'Threatened NZ native, zig-zag wiry stems, tiny heart leaves',
+    winter: 'keep', bloom: [], bloomText: '—',
+    build(b) {
+      const { rng } = b;
+      for (let i = 0; i < 55; i++) {
+        let p = V((rng() - 0.5) * 0.4, 0, (rng() - 0.5) * 0.4);
+        for (let k = 0; k < 7; k++) {
+          const d = randomDir(rng);
+          d.y = Math.abs(d.y) * 0.8 + 0.1;
+          let next = p.clone().addScaledVector(d, 0.25 + rng() * 0.15);
+          const lim = (next.x / 1.2) ** 2 + ((next.y - 0.9) / 1.0) ** 2 + (next.z / 1.2) ** 2;
+          if (lim > 1) next = p.clone().addScaledVector(d.setY(-Math.abs(d.y)), 0.2);
+          next.y = Math.max(0.05, next.y);
+          b.add('trunk', pick(rng, ['#8a5a3a', '#9a6440', '#7a4f33']), limb(p, next, 0.009, 0.007, 3));
+          for (let j = 0; j < 3; j++) {
+            const q = p.clone().lerp(next, rng()).add(randomDir(rng).multiplyScalar(0.04));
+            b.add('foliage', pick(rng, ['#7fa04a', '#8aab52', '#6f9442']), xf(blob(rng, 0.035, { detail: 0 }), q.x, q.y, q.z, rng(), rng() * 6, 0, 1, 0.35, 1), 0.2);
+          }
+          p = next;
+        }
+      }
+    },
+  },
+  {
+    id: 'pingao', name: 'Pīngao / golden sand sedge', latin: 'Ficinia spiralis', emoji: '🌾', category: NZ,
+    height: 0.6, spread: 1.2, mature: 3, start: 0.4, sun: 'Full sun', type: 'NZ native dune sedge, prized for weaving',
+    winter: 'keep', bloom: [], bloomText: '—',
+    build(b) {
+      const { rng } = b;
+      for (let i = 0; i < 60; i++) {
+        const a = rng() * Math.PI * 2;
+        const lean = 0.5 + rng() * 1.1;
+        blade(b, 'foliage', pick(rng, ['#c9a23a', '#b8962e', '#a8a040', '#d4b04a']), V((rng() - 0.5) * 0.2, 0, (rng() - 0.5) * 0.2), V(Math.cos(a) * lean, 1, Math.sin(a) * lean), 0.6 + rng() * 0.25, 0.018, { droop: 0.7, segs: 3, flat: 0.4 });
       }
     },
   },
@@ -980,6 +1244,287 @@ export const PLANTS = [
         flower(b, pick(rng, ['#fbe3ec', '#ffffff', '#f6cbd9']), '#e8d27a', p.clone().add(V(0, cy, 0)), p.clone().normalize(), 0.1);
       }
       dots(b, 'fruit', ['#c0392b', '#d35400', '#a93226'], { ...shell, n: 30, r: 0.07, minY: -0.6, detail: 1 });
+    },
+  },
+  {
+    id: 'lemon', name: 'Lemon tree', latin: "Citrus × meyeri 'Meyer'", emoji: '🍋', category: 'Edible',
+    height: 3, spread: 2.6, mature: 8, start: 0.3, sun: 'Full sun', type: 'Evergreen citrus',
+    winter: 'keep', bloom: ['spring'], fruit: ['autumn', 'winter', 'spring'], bloomText: 'Scented flowers in spring, fruit most of the year',
+    build(b) {
+      const { rng } = b;
+      trunk(b, '#6b5a45', 0.7, 0.08, 0.06, { crook: 0.06 });
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + rng();
+        branch(b, '#6b5a45', V(0, 0.6, 0), V(Math.cos(a) * 0.8, 1.4 + rng() * 0.4, Math.sin(a) * 0.8), 0.05, 0.025, 2);
+      }
+      const cy = 1.7;
+      canopy(b, { cy, rx: 1.3, ry: 1.05, rz: 1.3, n: 16, r: 0.48, color: '#2f5f2a', tufts: 1.8 });
+      const shell = { cy, rx: 1.3 * 0.7 + 0.42, ry: 1.05 * 0.7 + 0.42, rz: 1.3 * 0.7 + 0.42 };
+      dots(b, 'flower', ['#fbfaf2', '#f4f0e0'], { ...shell, n: 45, r: 0.03 });
+      dots(b, 'fruit', ['#f2d43a', '#e8c52a', '#efd94f'], { ...shell, n: 35, r: 0.065, minY: -0.7, detail: 1, stretch: 1.25 });
+    },
+  },
+  {
+    id: 'feijoa', name: 'Feijoa', latin: 'Acca sellowiana', emoji: '🍐', category: 'Edible',
+    height: 3.5, spread: 3, mature: 8, start: 0.3, sun: 'Full sun', type: 'Evergreen fruiting shrub, a Kiwi favourite',
+    winter: 'keep', bloom: ['summer'], fruit: ['autumn'], bloomText: 'Red-and-white flowers in summer, fruit Mar–May',
+    build(b) {
+      const { rng } = b;
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + rng();
+        const top = V(Math.cos(a) * 0.5, 1.6 + rng() * 0.3, Math.sin(a) * 0.5);
+        b.add('trunk', '#8a7a66', barkGeo(V(Math.cos(a) * 0.05, 0, Math.sin(a) * 0.05), top, 0.07, 0.04, { seg: 6, crook: 0.12, seed: rng() * 99 }));
+        branch(b, '#8a7a66', top, top.clone().add(V(Math.cos(a) * 0.6, 0.7, Math.sin(a) * 0.6)), 0.04, 0.02, 2);
+      }
+      const cy = 2.3;
+      canopy(b, { cy, rx: 1.5, ry: 1.2, rz: 1.5, n: 18, r: 0.45, color: '#6f8a6a', tufts: 1.6 });
+      const shell = { cy, rx: 1.5 * 0.7 + 0.4, ry: 1.2 * 0.7 + 0.4, rz: 1.5 * 0.7 + 0.4 };
+      for (let i = 0; i < 40; i++) {
+        const p = onEllipsoid(rng, shell.rx, shell.ry, shell.rz, -0.3);
+        flower(b, '#f3dede', '#c8102e', p.clone().add(V(0, cy, 0)), p.clone().normalize(), 0.06, 4);
+      }
+      dots(b, 'fruit', ['#5d7a3a', '#4f6f30'], { ...shell, n: 40, r: 0.05, minY: -0.7, detail: 1, stretch: 1.5 });
+    },
+  },
+  {
+    id: 'avocado', name: 'Avocado tree', latin: "Persea americana 'Hass'", emoji: '🥑', category: 'Edible',
+    height: 8, spread: 7, mature: 15, start: 0.15, sun: 'Full sun', type: 'Evergreen fruit tree, needs shelter from wind and frost',
+    winter: 'keep', bloom: ['spring'], fruit: ['spring', 'summer'], bloomText: 'Flowers in spring, fruit hangs into summer',
+    build(b) {
+      const { rng } = b;
+      const bark = '#5d4f42';
+      trunk(b, bark, 2.6, 0.26, 0.16, { crook: 0.06 });
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + rng();
+        branch(b, bark, V(0, 2 + rng() * 0.6, 0), V(Math.cos(a) * 2.4, 4.6 + rng(), Math.sin(a) * 2.4), 0.12, 0.05, 3);
+      }
+      const cy = 5;
+      canopy(b, { cy, rx: 3.1, ry: 2.5, rz: 3.1, n: 18, r: 1.05, color: '#2f4f2a', tufts: 1.6 });
+      const shell = { cy, rx: 3.1 * 0.7 + 0.85, ry: 2.5 * 0.7 + 0.85, rz: 3.1 * 0.7 + 0.85 };
+      dots(b, 'flower', ['#d8d88a', '#cfd27a'], { ...shell, n: 70, r: 0.04 });
+      dots(b, 'fruit', ['#2f3f1f', '#36461f'], { ...shell, n: 40, r: 0.075, minY: -0.8, detail: 1, stretch: 1.6 });
+    },
+  },
+  {
+    id: 'fig', name: 'Fig tree', latin: "Ficus carica 'Brown Turkey'", emoji: '🟤', category: 'Edible',
+    height: 3.5, spread: 4, mature: 8, start: 0.3, sun: 'Full sun', type: 'Deciduous fruit tree with big lobed leaves',
+    autumn: '#c9a43a', winter: 'bare', bloom: [], fruit: ['summer', 'autumn'], bloomText: 'Fruit late summer to autumn',
+    build(b) {
+      const { rng } = b;
+      const bark = '#9a948a';
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + rng();
+        const top = V(Math.cos(a) * 0.8, 1.6 + rng() * 0.4, Math.sin(a) * 0.8);
+        b.add('trunk', bark, barkGeo(V(Math.cos(a) * 0.1, 0, Math.sin(a) * 0.1), top, 0.12, 0.08, { crook: 0.1, rough: 0.05, seed: rng() * 99 }));
+        branch(b, bark, top, top.clone().add(V(Math.cos(a) * 0.9, 0.9, Math.sin(a) * 0.9)), 0.07, 0.035, 3);
+      }
+      broadLeaves(b, ['#5a8a40', '#689a48', '#55803c'], { cy: 2.5, rx: 1.8, ry: 0.95, rz: 1.8, n: 240, size: 0.17, tilt: 1 });
+      dots(b, 'fruit', ['#5a3a5e', '#6b4a3a', '#7a8a3a'], { cy: 2.4, rx: 1.6, ry: 0.8, rz: 1.6, n: 30, r: 0.04, minY: -0.8, detail: 1, stretch: 1.3 });
+    },
+  },
+  {
+    id: 'plum', name: 'Plum tree', latin: "Prunus salicina 'Satsuma'", emoji: '🟣', category: 'Edible',
+    height: 4, spread: 3.5, mature: 8, start: 0.3, sun: 'Full sun', type: 'Deciduous stone fruit',
+    autumn: '#b5532f', winter: 'bare', bloom: ['spring'], fruit: ['summer'], bloomText: 'White blossom in spring, fruit in summer',
+    build(b) {
+      const { rng } = b;
+      const bark = '#4f3b30';
+      trunk(b, bark, 1.4, 0.13, 0.08, { crook: 0.08 });
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + rng();
+        branch(b, bark, V(0, 1.2, 0), V(Math.cos(a) * 1.2, 2.6 + rng() * 0.6, Math.sin(a) * 1.2), 0.06, 0.025, 3);
+      }
+      const cy = 2.8;
+      canopy(b, { cy, rx: 1.7, ry: 1.15, rz: 1.7, n: 12, r: 0.62, color: '#4f7a35' });
+      const shell = { cy, rx: 1.7 * 0.7 + 0.5, ry: 1.15 * 0.7 + 0.5, rz: 1.7 * 0.7 + 0.5 };
+      for (let i = 0; i < 60; i++) {
+        const p = onEllipsoid(rng, shell.rx, shell.ry, shell.rz, -0.2);
+        flower(b, pick(rng, ['#ffffff', '#f7f4ee']), '#e8d27a', p.clone().add(V(0, cy, 0)), p.clone().normalize(), 0.08);
+      }
+      dots(b, 'fruit', ['#5a2a5e', '#6b2f6e', '#7a2f4e'], { ...shell, n: 45, r: 0.045, minY: -0.7, detail: 1 });
+    },
+  },
+  {
+    id: 'blueberry', name: 'Blueberry bush', latin: 'Vaccinium corymbosum', emoji: '🫐', category: 'Edible',
+    height: 1.5, spread: 1.2, mature: 5, start: 0.35, sun: 'Full sun', type: 'Deciduous shrub, likes acid soil, red autumn colour',
+    autumn: '#b8332a', winter: 'bare', bloom: ['spring'], fruit: ['summer'], bloomText: 'White bells in spring, berries in summer',
+    build(b) {
+      const { rng } = b;
+      mulch(b, 0.5);
+      for (let i = 0; i < 9; i++) {
+        const a = (i / 9) * Math.PI * 2 + rng();
+        b.add('trunk', '#8a4a3a', barkGeo(V(0, 0, 0), V(Math.cos(a) * 0.45, 1.1 + rng() * 0.3, Math.sin(a) * 0.45), 0.02, 0.01, { seg: 4, rings: 3, crook: 0.15, rough: 0.05, seed: rng() * 99 }));
+      }
+      const cy = 0.95;
+      canopy(b, { cy, rx: 0.65, ry: 0.5, rz: 0.65, n: 14, r: 0.24, color: '#4f7a45', tufts: 1.8 });
+      dots(b, 'flower', ['#fbfaf2', '#f3e8e8'], { cy, rx: 0.68, ry: 0.55, rz: 0.68, n: 45, r: 0.022, stretch: 1.4 });
+      dots(b, 'fruit', ['#3b4a8a', '#2f3f7a', '#4a5a9a'], { cy, rx: 0.68, ry: 0.55, rz: 0.68, n: 70, r: 0.022, minY: -0.6, detail: 1 });
+    },
+  },
+  {
+    id: 'raspberry', name: 'Raspberry canes (2 m row)', latin: 'Rubus idaeus', emoji: '🍓', category: 'Edible',
+    height: 1.7, spread: 2.2, mature: 2, start: 0.5, sun: 'Full sun', type: 'Fruiting canes trained on wires',
+    autumn: '#b5a03a', winter: 'bare', bloom: ['spring'], fruit: ['summer'], bloomText: 'Fruit in summer',
+    build(b) {
+      const { rng } = b;
+      post(b, -1, 0, 1.7);
+      post(b, 1, 0, 1.7);
+      for (const y of [0.9, 1.45]) for (const z of [-0.15, 0.15]) wire(b, V(-1, y, z), V(1, y, z));
+      for (let i = 0; i < 16; i++) {
+        const x = -0.9 + (i / 15) * 1.8 + (rng() - 0.5) * 0.08;
+        const base = V(x, 0, (rng() - 0.5) * 0.15);
+        const top = V(x + (rng() - 0.5) * 0.2, 1.5 + rng() * 0.25, (rng() - 0.5) * 0.3);
+        b.add('trunk', '#7a5a3a', limb(base, top, 0.012, 0.008, 4));
+        for (let k = 0; k < 6; k++) {
+          const p = base.clone().lerp(top, 0.3 + k * 0.12);
+          b.add('foliage', pick(rng, ['#4f7a35', '#5a8540']), xf(blob(rng, 0.09, { detail: 1, jitter: 0.15 }).translate(0, 0, 0.07), p.x, p.y, p.z, -0.4, rng() * Math.PI * 2, 0, 1, 0.15, 1.2));
+          if (rng() < 0.6) b.add('fruit', '#c0233a', xf(blob(rng, 0.02, { detail: 1 }), p.x + (rng() - 0.5) * 0.1, p.y - 0.04, p.z + (rng() - 0.5) * 0.1, 0, 0, 0, 1, 1.2, 1));
+        }
+      }
+    },
+  },
+  {
+    id: 'strawberry', name: 'Strawberry patch (1 m²)', latin: 'Fragaria × ananassa', emoji: '🍓', category: 'Edible',
+    height: 0.25, spread: 1.2, mature: 1, start: 0.6, sun: 'Full sun', type: 'Perennial, mulched with straw',
+    winter: 'keep', bloom: ['spring'], fruit: ['summer'], bloomText: 'Flowers in spring, berries in summer',
+    build(b) {
+      const { rng } = b;
+      b.add('mulch', '#c9b06a', box(1, 0.03, 1));
+      for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+          const x = -0.33 + c * 0.33, z = -0.33 + r * 0.33;
+          for (let k = 0; k < 8; k++) {
+            const a = (k / 8) * Math.PI * 2 + rng();
+            b.add('foliage', pick(rng, ['#3f7a35', '#4a8540']), xf(blob(rng, 0.05, { detail: 1, jitter: 0.12 }).translate(0, 0, 0.07), x, 0.08 + rng() * 0.08, z, -(0.3 + rng() * 0.5), a, 0, 1, 0.15, 1));
+          }
+          for (let k = 0; k < 2; k++) flower(b, '#ffffff', '#e8c52a', V(x + (rng() - 0.5) * 0.15, 0.17, z + (rng() - 0.5) * 0.15), V(0, 1, 0), 0.03);
+          for (let k = 0; k < 3; k++) {
+            const a = rng() * Math.PI * 2;
+            b.add('fruit', pick(rng, ['#d32f2f', '#c62828']), xf(blob(rng, 0.022, { detail: 1 }), x + Math.cos(a) * 0.12, 0.05, z + Math.sin(a) * 0.12, 0, 0, 0, 1, 1.25, 1));
+          }
+        }
+      }
+    },
+  },
+  {
+    id: 'tomato', name: 'Tomatoes (3 staked)', latin: 'Solanum lycopersicum', emoji: '🍅', category: 'Edible',
+    height: 1.6, spread: 1.2, mature: 0.5, start: 0.25, sun: 'Full sun', type: 'Summer crop, planted after Labour Weekend',
+    winter: 'bare', dormant: ['winter'], bloom: ['summer'], fruit: ['summer', 'autumn'], bloomText: 'Fruit from mid-summer into autumn',
+    build(b) {
+      const { rng } = b;
+      mulch(b, 0.55);
+      for (let i = 0; i < 3; i++) {
+        const x = -0.4 + i * 0.4;
+        post(b, x + 0.06, 0, 1.6, 0.03);
+        const top = V(x, 1.45, 0);
+        b.add('foliage', '#4f7a35', limb(V(x, 0, 0), top, 0.018, 0.01, 5));
+        for (let k = 0; k < 12; k++) {
+          const p = V(x, 0.2 + k * 0.11, 0);
+          b.add('foliage', pick(rng, ['#3f6f2f', '#4a7a35']), xf(blob(rng, 0.11, { detail: 1, jitter: 0.25 }).translate(0, 0, 0.1), p.x, p.y, p.z, -0.2, rng() * Math.PI * 2, 0, 1, 0.3, 1.3));
+        }
+        for (let t = 0; t < 4; t++) {
+          const y = 0.4 + t * 0.25;
+          const a = rng() * Math.PI * 2;
+          for (let k = 0; k < 4; k++) {
+            const colour = t < 2 ? pick(rng, ['#d63a2a', '#c62f22']) : pick(rng, ['#7aa83a', '#e0702a']);
+            b.add('fruit', colour, xf(blob(rng, 0.035, { detail: 1 }), x + Math.cos(a) * 0.12 + (rng() - 0.5) * 0.06, y - k * 0.04, Math.sin(a) * 0.12 + (rng() - 0.5) * 0.06));
+          }
+          dots(b, 'flower', ['#f2d43a'], { cy: y + 0.12, x: x + Math.cos(a) * 0.1, z: Math.sin(a) * 0.1, rx: 0.05, ry: 0.04, rz: 0.05, n: 3, r: 0.015 });
+        }
+      }
+    },
+  },
+  {
+    id: 'passionfruit', name: 'Passionfruit (2 m trellis)', latin: 'Passiflora edulis', emoji: '💜', category: 'Edible',
+    height: 2.1, spread: 2.2, mature: 3, start: 0.4, sun: 'Full sun', type: 'Evergreen climber on a trellis or fence',
+    winter: 'keep', bloom: ['spring', 'summer'], fruit: ['autumn'], bloomText: 'Purple-and-white flowers, fruit in autumn',
+    build(b) {
+      const { rng } = b;
+      post(b, -1, 0, 2);
+      post(b, 1, 0, 2);
+      b.add('trunk', '#7a5c3e', xf(box(2.1, 0.06, 0.06), 0, 1.97, 0), 0.06);
+      for (let y = 0.4; y < 2; y += 0.4) wire(b, V(-1, y, 0), V(1, y, 0));
+      for (let s = 0; s < 5; s++) {
+        let p = V((rng() - 0.5) * 0.3, 0, 0.03);
+        for (let k = 0; k < 9; k++) {
+          const next = V(Math.max(-0.95, Math.min(0.95, p.x + (rng() - 0.5) * 0.6)), Math.min(1.95, p.y + 0.2 + rng() * 0.12), 0.03 + (rng() - 0.5) * 0.04);
+          b.add('trunk', '#5a7a35', limb(p, next, 0.012, 0.009, 3));
+          p = next;
+        }
+      }
+      for (let i = 0; i < 140; i++) {
+        const p = V((rng() - 0.5) * 1.9, 0.3 + rng() * 1.65, 0.05 + (rng() - 0.5) * 0.12);
+        b.add('foliage', pick(rng, ['#3f6f2f', '#4a7a35', '#356428']), xf(blob(rng, 0.08, { detail: 1, jitter: 0.15 }), p.x, p.y, p.z, Math.PI / 2 + (rng() - 0.5) * 0.6, (rng() - 0.5) * 0.6, rng() * 6, 1, 0.15, 1));
+      }
+      for (let i = 0; i < 18; i++) {
+        const p = V((rng() - 0.5) * 1.8, 0.4 + rng() * 1.5, 0.14);
+        flower(b, '#f0eef5', '#5a2a7a', p, V(0, 0.2, 1), 0.07, 10);
+      }
+      for (let i = 0; i < 22; i++) {
+        const p = V((rng() - 0.5) * 1.8, 0.4 + rng() * 1.4, 0.12);
+        b.add('fruit', pick(rng, ['#4a2048', '#5a2a55']), xf(blob(rng, 0.04, { detail: 1 }), p.x, p.y, p.z, 0, 0, 0, 1, 1.15, 1));
+      }
+    },
+  },
+  {
+    id: 'kiwifruit', name: 'Kiwifruit (pergola)', latin: 'Actinidia deliciosa', emoji: '🥝', category: 'Edible',
+    height: 2.6, spread: 3.2, mature: 6, start: 0.3, sun: 'Full sun', type: 'Deciduous vine on a pergola, needs a male and a female plant',
+    autumn: '#b5a03a', winter: 'bare', bloom: ['spring'], fruit: ['autumn'], bloomText: 'Cream flowers in spring, fruit in autumn',
+    build(b) {
+      const { rng } = b;
+      for (const [x, z] of [[-1.4, -1.4], [1.4, -1.4], [-1.4, 1.4], [1.4, 1.4]]) post(b, x, z, 2.3, 0.1);
+      for (const z of [-1.4, 1.4]) b.add('trunk', '#7a5c3e', xf(box(3, 0.1, 0.1), 0, 2.3, z), 0.06);
+      for (let x = -1.2; x <= 1.21; x += 0.6) b.add('trunk', '#7a5c3e', xf(box(0.06, 0.06, 3), x, 2.4, 0), 0.06);
+      b.add('trunk', '#6b5a45', barkGeo(V(-1.3, 0, -1.3), V(-1.2, 2.35, -1.2), 0.07, 0.05, { crook: 0.2, rough: 0.2, seed: 4 }));
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + rng();
+        b.add('trunk', '#6b5a45', limb(V(-1.2, 2.4, -1.2), V(Math.cos(a) * 1.2, 2.45, Math.sin(a) * 1.2), 0.04, 0.02, 4));
+      }
+      broadLeaves(b, ['#4a7a35', '#55853e', '#3f6f2f'], { cy: 2.55, rx: 1.6, ry: 0.12, rz: 1.6, n: 170, size: 0.17, tilt: 0.3 });
+      for (let i = 0; i < 90; i++) {
+        const p = V((rng() - 0.5) * 2.8, 2.25 - rng() * 0.15, (rng() - 0.5) * 2.8);
+        b.add('fruit', pick(rng, ['#8a6a3a', '#7a5c33']), xf(blob(rng, 0.035, { detail: 1 }), p.x, p.y, p.z, 0, 0, 0, 1, 1.35, 1));
+        if (i % 2) flower(b, '#f4efd8', '#e8c52a', p.clone().add(V(0, 0.05, 0)), V(0, -1, 0), 0.045);
+      }
+    },
+  },
+  {
+    id: 'rosemary', name: 'Rosemary', latin: 'Salvia rosmarinus', emoji: '🌿', category: 'Edible',
+    height: 1, spread: 1.1, mature: 4, start: 0.35, sun: 'Full sun', type: 'Evergreen herb, bees love it',
+    winter: 'keep', bloom: ['winter', 'spring'], bloomText: 'Blue flowers late winter to spring',
+    build(b) {
+      const { rng } = b;
+      mulch(b, 0.45);
+      for (let i = 0; i < 90; i++) {
+        const a = rng() * Math.PI * 2;
+        const lean = 0.1 + rng() * 0.5;
+        const tip = blade(b, 'foliage', pick(rng, ['#6f8a6a', '#5f7a5a', '#7a947a']), V((rng() - 0.5) * 0.25, 0.02, (rng() - 0.5) * 0.25), V(Math.cos(a) * lean, 1, Math.sin(a) * lean), 0.7 + rng() * 0.3, 0.03, { droop: 0.15, segs: 3, flat: 0.6 });
+        if (i % 3 === 0) b.add('flower', pick(rng, ['#7a8fd6', '#8fa0e0']), xf(blob(rng, 0.02, { detail: 0 }), tip.x, tip.y - 0.05, tip.z));
+      }
+    },
+  },
+  {
+    id: 'pumpkin', name: 'Pumpkin patch', latin: "Cucurbita maxima 'Crown'", emoji: '🎃', category: 'Edible',
+    height: 0.5, spread: 2.5, mature: 0.5, start: 0.2, sun: 'Full sun', type: 'Summer crop, sprawling vines',
+    winter: 'bare', dormant: ['winter'], bloom: ['summer'], fruit: ['summer', 'autumn'], bloomText: 'Harvest in autumn',
+    build(b) {
+      const { rng } = b;
+      mulch(b, 0.4);
+      for (let s = 0; s < 6; s++) {
+        let p = V(0, 0.04, 0);
+        let a = (s / 6) * Math.PI * 2 + rng() * 0.4;
+        for (let k = 0; k < 6; k++) {
+          a += (rng() - 0.5) * 0.7;
+          const next = p.clone().add(V(Math.cos(a) * 0.2, 0, Math.sin(a) * 0.2));
+          b.add('foliage', '#5a8540', limb(p, next, 0.02, 0.018, 4));
+          const leafAt = next.clone().add(V(0, 0.18 + rng() * 0.15, 0));
+          b.add('foliage', '#5a8540', limb(next, leafAt, 0.01, 0.008, 3));
+          b.add('foliage', pick(rng, ['#3f6f2f', '#4a7a35']), xf(blob(rng, 0.17, { detail: 1, jitter: 0.15 }), leafAt.x, leafAt.y, leafAt.z, -0.3 + rng() * 0.6, rng() * 6, 0, 1, 0.12, 1));
+          if (k === 3) dots(b, 'flower', ['#f2b318'], { cy: next.y + 0.1, x: next.x, z: next.z, rx: 0.05, ry: 0.05, rz: 0.05, n: 1, r: 0.06 });
+          if (k === 5 && s % 2 === 0) b.add('fruit', pick(rng, ['#9aa59a', '#e07a1f']), xf(blob(rng, 0.16, { detail: 2, jitter: 0.04 }), next.x, 0.12, next.z, 0, 0, 0, 1, 0.7, 1));
+          p = next;
+        }
+      }
     },
   },
   {

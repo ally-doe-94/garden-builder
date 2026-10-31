@@ -92,14 +92,14 @@ addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
-// Close-up on one plant: window.__focus('pohutukawa')
-window.__focus = (id) => {
+// Close-up on one plant: window.__focus('pohutukawa'), or window.__focus('kiwifruit', 1.4) to look from above
+window.__focus = (id, elevation = 0.6) => {
   const obj = plants.find((p) => p.userData.def.id === id);
   if (!obj) return false;
   const { height, spread } = obj.userData.def;
   const d = Math.max(height, spread) * 1.5;
   controls.target.set(obj.position.x, height * 0.45, 0);
-  camera.position.set(obj.position.x + d * 0.35, height * 0.6, d);
+  camera.position.set(obj.position.x + d * 0.35, Math.max(height * elevation, d * (elevation - 0.6)), d);
   controls.update();
   document.getElementById('label').textContent = `${obj.userData.def.name} — ${season}`;
   return true;
