@@ -1,0 +1,6 @@
+.DS_Store
+# Garden scans are large and personal; keep them out of the repo
+*.glb
+*.ply
+*.obj
+*.mtl

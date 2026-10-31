@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Northall Road Garden</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+        "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.3/build/index.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="viewport"></div>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🌿</span>
+      <div>
+        <h1>Northall Road Garden</h1>
+        <p id="scan-status">Demo garden — load your own scan to begin</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button id="btn-load-scan" class="primary">Load scan</button>
+      <button id="btn-help" title="How to scan your garden">How to scan</button>
+      <button id="btn-menu" class="icon" title="More">⋯</button>
+      <div id="menu" class="menu hidden">
+        <button data-action="export-layout">Save layout file (.json)</button>
+        <button data-action="import-layout">Open layout file…</button>
+        <button data-action="export-glb">Export 3D scene (.glb)</button>
+        <button data-action="snapshot">Save picture (.png)</button>
+        <hr />
+        <button data-action="clear-plants" class="danger">Remove all plants</button>
+        <button data-action="clear-scan" class="danger">Remove scan</button>
+      </div>
+    </div>
+    <input id="file-scan" type="file" accept=".glb,.gltf,.ply,.obj,.mtl,.bin,.jpg,.jpeg,.png" multiple hidden />
+    <input id="file-layout" type="file" accept=".json" hidden />
+  </header>
+
+  <aside id="palette" class="panel left">
+    <div class="panel-head">
+      <h2>Plants</h2>
+      <button class="icon collapse" data-collapse="palette" title="Collapse">‹</button>
+    </div>
+    <input id="plant-search" type="search" placeholder="Search plants…" />
+    <div id="plant-filters" class="chips"></div>
+    <div id="plant-grid" class="plant-grid"></div>
+    <div class="panel-section">
+      <h3>In this garden <span id="placed-count" class="muted"></span></h3>
+      <ul id="placed-list" class="placed-list"></ul>
+    </div>
+  </aside>
+
+  <aside id="inspector" class="panel right hidden">
+    <div class="panel-head">
+      <h2 id="insp-name">Plant</h2>
+      <button class="icon" id="insp-close" title="Deselect">✕</button>
+    </div>
+    <p id="insp-latin" class="latin"></p>
+    <div class="tool-row">
+      <button data-tool="translate" class="active" title="Move (G)">Move</button>
+      <button data-tool="rotate" title="Rotate (R)">Rotate</button>
+    </div>
+    <label>Size <output id="insp-size-out">100%</output>
+      <input id="insp-size" type="range" min="0.3" max="2.5" step="0.05" value="1" />
+    </label>
+    <dl id="insp-facts" class="facts"></dl>
+    <label>Planted
+      <input id="insp-planted" type="date" />
+    </label>
+    <label>Notes
+      <textarea id="insp-notes" rows="3" placeholder="Variety, where you bought it, care reminders…"></textarea>
+    </label>
+    <div class="tool-row">
+      <button id="insp-dup">Duplicate</button>
+      <button id="insp-del" class="danger">Delete</button>
+    </div>
+  </aside>
+
+  <aside id="scan-panel" class="panel right hidden">
+    <div class="panel-head">
+      <h2>Scan settings</h2>
+      <button class="icon" id="scan-close" title="Close">✕</button>
+    </div>
+    <p id="scan-info" class="muted"></p>
+    <h3>Orientation</h3>
+    <p class="muted small">If your garden appears on its side, rotate it until the ground is flat.</p>
+    <div class="tool-row">
+      <button data-scan-rot="x+">Tilt ↻</button>
+      <button data-scan-rot="x-">Tilt ↺</button>
+      <button data-scan-rot="z+">Roll ↻</button>
+      <button data-scan-rot="y+">Turn 90°</button>
+    </div>
+    <label>Scale (scan units → metres)
+      <input id="scan-scale" type="number" min="0.001" step="0.1" value="1" />
+    </label>
+    <label>Ground height adjust (m)
+      <input id="scan-offset" type="range" min="-2" max="2" step="0.01" value="0" />
+    </label>
+    <label id="point-size-row">Point size
+      <input id="scan-point-size" type="range" min="0.002" max="0.1" step="0.002" value="0.015" />
+    </label>
+    <label class="check"><input id="scan-lit" type="checkbox" checked /> Show sun &amp; shadows on scan</label>
+    <label class="check"><input id="show-ground" type="checkbox" /> Show placement ground plane</label>
+  </aside>
+
+  <section id="bottombar" class="bottombar">
+    <div class="slider">
+      <label for="years">Growth <output id="years-out">Just planted</output></label>
+      <input id="years" type="range" min="0" max="20" step="1" value="3" />
+    </div>
+    <div class="slider">
+      <label for="month">Month <output id="month-out"></output></label>
+      <input id="month" type="range" min="1" max="12" step="1" value="6" />
+    </div>
+    <div class="slider">
+      <label for="hour">Time <output id="hour-out"></output></label>
+      <input id="hour" type="range" min="4" max="22" step="0.25" value="14" />
+    </div>
+    <div class="toggles">
+      <label class="check"><input id="show-spread" type="checkbox" /> Mature spread</label>
+      <button id="btn-scan-settings">Scan settings</button>
+      <button id="btn-sun-settings" class="icon" title="Location &amp; compass">🧭</button>
+    </div>
+    <div id="sun-settings" class="popover hidden">
+      <label>Latitude <input id="lat" type="number" min="-66" max="66" step="0.1" value="51.5" /></label>
+      <label>North direction <output id="north-out">0°</output>
+        <input id="north" type="range" min="0" max="359" step="1" value="0" />
+      </label>
+      <p class="muted small">Rotate until the red compass needle points to real north in your scan.</p>
+    </div>
+  </section>
+
+  <div id="hint" class="hint hidden"></div>
+  <div id="drop-overlay" class="drop-overlay hidden"><div>Drop your garden scan here<br /><small>.glb · .gltf · .ply · .obj</small></div></div>
+  <div id="loading" class="loading hidden"><div class="spinner"></div><span id="loading-text">Loading…</span></div>
+  <div id="toast" class="toast hidden"></div>
+
+  <dialog id="help-dialog">
+    <form method="dialog">
+      <h2>Scanning your garden</h2>
+      <ol>
+        <li><strong>Get a scanning app</strong> on your phone: <em>Polycam</em>, <em>Scaniverse</em>, <em>Luma AI</em>, <em>KIRI Engine</em> or <em>RealityScan</em> all work. iPhone Pro / iPad Pro models with LiDAR give the quickest results.</li>
+        <li><strong>Pick a bright, overcast day.</strong> Harsh sun and moving shadows make scans patchy.</li>
+        <li><strong>Walk slowly</strong> around the edge of the garden with the phone at chest height, pointing slightly down. Then do a second loop pointing more steeply at the ground. Overlap is good.</li>
+        <li><strong>Export</strong> as <strong>GLB</strong> (best: textured mesh), or <strong>PLY</strong> (point cloud or Gaussian splat) or <strong>OBJ</strong>.</li>
+        <li><strong>Load it here</strong> with <em>Load scan</em> or drag the file onto the page. Use <em>Scan settings</em> to fix orientation or scale if needed.</li>
+      </ol>
+      <h3>Using the planner</h3>
+      <ul>
+        <li>Pick a plant on the left, then click/tap in the garden to plant it. Keep clicking to plant more; press <kbd>Esc</kbd> to stop.</li>
+        <li>Click a plant to select it: move, rotate, resize, add notes.</li>
+        <li>Slide <em>Growth</em> to see how big things get over the years, and <em>Month</em>/<em>Time</em> to check sun, shade and the seasons.</li>
+        <li>Everything is saved in this browser automatically. Use <em>⋯ → Save layout file</em> to back up or move to another device.</li>
+      </ul>
+      <div class="tool-row end"><button class="primary" value="close">Got it</button></div>
+    </form>
+  </dialog>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

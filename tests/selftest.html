@@ -1,0 +1,77 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Self test</title>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
+  "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.3/build/index.module.js" } }
+</script></head>
+<body><pre id="out">running…</pre>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
+import { PLANTS, createPlant, setPlantAge, applySeason } from '../js/plants.js';
+import { loadScan, createScanRig, guessOrientation, applyScanTransform, setScanLit } from '../js/scan.js';
+const log = [];
+const ok = (c, m) => log.push(`${c ? 'PASS' : 'FAIL'} ${m}`);
+
+// Every plant builds in every season and at several ages.
+for (const p of PLANTS) {
+  try {
+    const root = createPlant(p.id, 42);
+    for (const s of ['spring', 'summer', 'autumn', 'winter']) applySeason(root, s);
+    for (const y of [0, 1, 5, 40]) setPlantAge(root, y);
+    setPlantAge(root, 100);
+    const box = new THREE.Box3().setFromObject(root.userData.growth);
+    const h = box.max.y - box.min.y;
+    ok(Math.abs(h - p.height) / p.height < 0.45, `${p.id} mature height ${h.toFixed(2)} vs ${p.height}`);
+  } catch (e) { ok(false, `${p.id}: ${e.message}`); }
+}
+
+// Z-up point cloud PLY (ground plane at z=5 plus a tree) -> should auto-orient to Y-up, ground at 0.
+let ply = [];
+for (let i = 0; i < 3000; i++) ply.push(`${(Math.random() * 10).toFixed(3)} ${(Math.random() * 8).toFixed(3)} 5 120 160 90`);
+for (let i = 0; i < 300; i++) ply.push(`${(5 + Math.random()).toFixed(3)} ${(4 + Math.random()).toFixed(3)} ${(5 + Math.random() * 4).toFixed(3)} 60 120 50`);
+const head = `ply\nformat ascii 1.0\nelement vertex ${ply.length}\nproperty float x\nproperty float y\nproperty float z\nproperty uchar red\nproperty uchar green\nproperty uchar blue\nend_header\n`;
+try {
+  const loaded = await loadScan([{ name: 'cloud.ply', blob: new Blob([head + ply.join('\n')]) }]);
+  const rig = createScanRig(loaded);
+  const q = guessOrientation(rig);
+  const b = applyScanTransform(rig, { quaternion: q.toArray(), scale: 1, offset: 0 });
+  ok(loaded.kind === 'points' && loaded.stats.points === 3300, `ply points ${loaded.stats.points}`);
+  ok(Math.abs(b.min.y) < 0.05 && b.max.y > 3 && b.max.y < 4.5, `ply auto-orient bounds y ${b.min.y.toFixed(2)}..${b.max.y.toFixed(2)}`);
+  ok(b.max.x - b.min.x > 8 && b.max.z - b.min.z > 6, `ply horizontal extent ${(b.max.x - b.min.x).toFixed(1)} x ${(b.max.z - b.min.z).toFixed(1)}`);
+} catch (e) { ok(false, `ply: ${e.stack}`); }
+
+// Gaussian splat style PLY (f_dc colours, binary).
+try {
+  const n = 500, props = ['x', 'y', 'z', 'f_dc_0', 'f_dc_1', 'f_dc_2', 'opacity'];
+  const header = `ply\nformat binary_little_endian 1.0\nelement vertex ${n}\n${props.map((p) => `property float ${p}`).join('\n')}\nend_header\n`;
+  const body = new Float32Array(n * props.length);
+  for (let i = 0; i < n; i++) body.set([Math.random() * 4, Math.random() * 0.2, Math.random() * 4, 1, -1, 0, 1], i * props.length);
+  const loaded = await loadScan([{ name: 'splat.ply', blob: new Blob([header, body.buffer]) }]);
+  let col;
+  loaded.object.traverse((o) => { if (o.isPoints) col = o.geometry.attributes.color; });
+  ok(col && Math.abs(col.getX(0) - (0.5 + 0.2821)) < 0.01 && Math.abs(col.getY(0) - (0.5 - 0.2821)) < 0.01, `splat colours ${col?.getX(0).toFixed(3)}`);
+} catch (e) { ok(false, `splat: ${e.stack}`); }
+
+// GLB round trip: textured-ish mesh exported then loaded as a scan, with BVH raycast.
+try {
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(12, 9, 20, 20).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x55aa55 }));
+  ground.position.y = 3;
+  const glb = await new GLTFExporter().parseAsync(ground, { binary: true });
+  const loaded = await loadScan([{ name: 'garden.glb', blob: new Blob([glb]) }]);
+  const rig = createScanRig(loaded);
+  const b = applyScanTransform(rig, { quaternion: [0, 0, 0, 1], scale: 1, offset: 0 });
+  const scene = new THREE.Scene(); scene.add(rig); scene.updateMatrixWorld(true);
+  const rc = new THREE.Raycaster(new THREE.Vector3(1, 5, 1), new THREE.Vector3(0, -1, 0));
+  const hit = rc.intersectObjects(rig.userData.raycastTargets, false)[0];
+  ok(loaded.stats.triangles === 800, `glb triangles ${loaded.stats.triangles}`);
+  ok(hit && Math.abs(hit.point.y) < 0.01, `glb grounded, raycast y=${hit?.point.y.toFixed(3)}`);
+  setScanLit(rig, false); setScanLit(rig, true);
+  ok(true, 'lit/unlit toggle');
+} catch (e) { ok(false, `glb: ${e.stack}`); }
+
+document.getElementById('out').textContent = log.join('\n');
+window.__done = log;
+</script></body></html>
