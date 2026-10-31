@@ -38,6 +38,7 @@ export function initSync(api) {
   function setStatus(kind) {
     const text = {
       local: ['Sign in', 'Not signed in: your garden is only on this device'],
+      setup: ['Set up', 'Signed in: create or join a shared garden'],
       syncing: ['Syncing…', 'Saving changes to your shared garden'],
       synced: ['Synced', 'Your shared garden is up to date'],
       offline: ['Offline', "Can't reach the server. Changes will sync when it's back"],
@@ -323,7 +324,7 @@ export function initSync(api) {
     try {
       s.garden = await cloud.myGarden();
       renderAccount();
-      if (!s.garden) { setStatus('local'); openDialog(); return; }
+      if (!s.garden) { setStatus('setup'); openDialog(); return; }
       await connect();
       api.toast(`Signed in. Shared garden “${s.garden.name}” is ready.`);
     } catch (err) {
@@ -347,12 +348,12 @@ export function initSync(api) {
     if (view === 'garden') {
       $('garden-name').textContent = s.garden.name;
       $('garden-code').textContent = s.garden.join_code;
-      $('account-email').textContent = s.user.email ?? '';
+      $('account-email').textContent = cloud.displayName(s.user);
       cloud.members(s.garden.id).then((rows) => {
-        $('garden-members').innerHTML = rows.map((m) => `<li>${escapeHtml(m.email ?? 'Someone')}</li>`).join('');
+        $('garden-members').innerHTML = rows.map((m) => `<li>${escapeHtml(cloud.displayName(m.email ?? '') || 'Someone')}</li>`).join('');
       }).catch(() => {});
     }
-    if (view === 'no-garden') $('no-garden-email').textContent = s.user.email ?? '';
+    if (view === 'no-garden') $('no-garden-email').textContent = cloud.displayName(s.user);
   }
 
   const escapeHtml = (t) => t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -365,13 +366,32 @@ export function initSync(api) {
   $('btn-account').addEventListener('click', openDialog);
   $('account-close').addEventListener('click', closeDialog);
 
-  $('auth-send').addEventListener('click', () => run($('auth-send'), async () => {
-    const email = $('auth-email').value.trim();
-    if (!/^\S+@\S+\.\S+$/.test(email)) { $('auth-msg').textContent = 'Enter your email address first.'; return; }
-    await cloud.sendLink(email);
-    $('auth-msg').textContent = `Link sent to ${email}. Open it on this device to finish signing in. It can take a minute to arrive.`;
-  }));
-  $('auth-email').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('auth-send').click(); });
+  function credentials() {
+    const username = $('auth-user').value.trim().toLowerCase();
+    const password = $('auth-pass').value;
+    if (!cloud.USERNAME_PATTERN.test(username)) {
+      throw new Error('Usernames are 3–30 letters or numbers (dots, dashes and underscores are fine too).');
+    }
+    if (password.length < 6) throw new Error('Passwords need at least 6 characters.');
+    return [username, password];
+  }
+  async function authenticate(button, action) {
+    $('auth-msg').textContent = '';
+    button.disabled = true;
+    try {
+      await action(...credentials());
+      $('auth-pass').value = '';
+    } catch (err) {
+      $('auth-msg').textContent = message(err);
+    } finally {
+      button.disabled = false;
+    }
+  }
+  $('auth-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    authenticate($('auth-signin'), cloud.signIn);
+  });
+  $('auth-signup').addEventListener('click', () => authenticate($('auth-signup'), cloud.signUp));
 
   $('garden-create').addEventListener('click', () => run($('garden-create'), async () => {
     s.garden = await cloud.createGarden($('new-garden-name').value);

@@ -205,7 +205,8 @@ dialog li { margin-bottom: 6px; }
 /* ---------- account / sharing ---------- */
 .top-actions > button.account { display: inline-flex; align-items: center; gap: 4px; }
 .account[data-status="synced"] .cloud { color: var(--accent); }
-.account[data-status="syncing"] .cloud { color: #ffd166; }
+.account[data-status="syncing"] .cloud, .account[data-status="setup"] .cloud { color: #ffd166; }
+.auth-msg { color: var(--danger); min-height: 1em; margin-top: 8px; }
 .account[data-status="offline"] .cloud { color: var(--danger); }
 .dlg-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 dialog p { line-height: 1.5; font-size: 14px; }

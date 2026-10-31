@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Plant Gallery</title>
+<style>
+  :root { color-scheme: light; }
+  body { margin: 0; background: #a7cbe3; font-family: system-ui, sans-serif; }
+  #bar { position: fixed; top: 10px; left: 10px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 2; }
+  #bar button { padding: 6px 10px; border-radius: 8px; border: 1px solid #0002; background: #fff; cursor: pointer; }
+  #bar button.on { background: #7bc67e; }
+  #label { position: fixed; bottom: 10px; left: 10px; background: #fffd; padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="bar"></div>
+<div id="label">Every plant at full size. Drag to orbit.</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { PLANTS, CATEGORIES, createPlant, setPlantAge, applySeason } from '../js/plants.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#a7cbe3');
+scene.add(new THREE.HemisphereLight('#dfefff', '#4a5a3a', 1));
+const sun = new THREE.DirectionalLight('#fff4e0', 2.6);
+sun.position.set(20, 30, 15);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, far: 120 });
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: '#6f9d4b' }));
+ground.receiveShadow = true;
+scene.add(ground);
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 500);
+const controls = new OrbitControls(camera, renderer.domElement);
+
+const plants = [];
+let category = new URLSearchParams(location.search).get('cat') || CATEGORIES[0];
+let season = 'summer';
+
+function layout() {
+  for (const p of plants) scene.remove(p);
+  plants.length = 0;
+  const list = PLANTS.filter((p) => category === 'All' || p.category === category);
+  let x = 0;
+  for (const def of list) {
+    const obj = createPlant(def.id, 7);
+    setPlantAge(obj, 100);
+    applySeason(obj, season);
+    x += def.spread / 2;
+    obj.position.set(x, 0, 0);
+    x += def.spread / 2 + 0.6;
+    scene.add(obj);
+    plants.push(obj);
+  }
+  const width = x;
+  const tallest = Math.max(...list.map((p) => p.height));
+  controls.target.set(width / 2, tallest * 0.35, 0);
+  camera.position.set(width / 2, tallest * 0.9, Math.max(width * 0.62, tallest * 2.4));
+  controls.update();
+  document.getElementById('label').textContent = list.map((p) => p.name).join(' · ') + ` — ${season}`;
+}
+
+function bar() {
+  const el = document.getElementById('bar');
+  el.innerHTML = [...['All', ...CATEGORIES].map((c) => `<button data-c="${c}" class="${c === category ? 'on' : ''}">${c}</button>`),
+    ...['spring', 'summer', 'autumn', 'winter'].map((s) => `<button data-s="${s}" class="${s === season ? 'on' : ''}">${s}</button>`)].join('');
+}
+document.getElementById('bar').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.dataset.c) category = b.dataset.c;
+  if (b.dataset.s) season = b.dataset.s;
+  bar();
+  layout();
+});
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+// Close-up on one plant: window.__focus('pohutukawa')
+window.__focus = (id) => {
+  const obj = plants.find((p) => p.userData.def.id === id);
+  if (!obj) return false;
+  const { height, spread } = obj.userData.def;
+  const d = Math.max(height, spread) * 1.5;
+  controls.target.set(obj.position.x, height * 0.45, 0);
+  camera.position.set(obj.position.x + d * 0.35, height * 0.6, d);
+  controls.update();
+  document.getElementById('label').textContent = `${obj.userData.def.name} — ${season}`;
+  return true;
+};
+window.__season = (s) => { season = s; bar(); layout(); };
+bar();
+layout();
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+window.__ready = true;
+</script>
+</body>
+</html>

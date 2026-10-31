@@ -8,7 +8,7 @@ There's no build step and nothing to install. It's plain HTML, CSS and ES module
 
 - **Load a 3D scan** of your garden: `.glb` / `.gltf` (textured mesh, the best option), `.ply` (mesh, point cloud or Gaussian splat), `.obj` (plus `.mtl` and textures if you drop them in together). Draco and Meshopt compressed GLBs work too.
 - **Fix the orientation**: PLY and OBJ scans are turned upright automatically. *Scan settings* lets you tilt, roll, rescale or raise/lower the ground.
-- **18 low-poly plants**: trees, shrubs, flowers, foliage plants and a raised veg bed. Each has its mature size, sun needs and flowering time.
+- **33 plants**, including a **New Zealand natives** collection (pōhutukawa, kōwhai, tī kōuka, nīkau, ponga, harakeke, mānuka, kawakawa, koromiko, kōhūhū, toetoe, taupata, horoeka, rengarenga, kāpuka) alongside trees, shrubs, flowers, foliage plants and a raised veg bed. Each has its mature size, sun needs and flowering time, and is modelled with bark, twigs, leafy canopies and petals.
 - **Plant by clicking**: pick a plant, then click (or tap) on the ground in the scan. Each copy gets a slightly different shape.
 - **Edit plants**: select a plant to move it (it stays on the ground), rotate it, resize it, duplicate or delete it, and add a planted date and notes.
 - **Growth slider**: see the garden today or up to 20 years ahead. Each plant's age comes from its planted date.
@@ -21,7 +21,9 @@ There's no build step and nothing to install. It's plain HTML, CSS and ES module
 
 ## Sharing with a partner
 
-Sign in (top right) to keep your scan and plants online and plan the garden together. Both of you use your own email and get a sign-in link, so there are no passwords. One of you creates the garden and gets an invite code. The other signs in and joins with that code.
+Sign in (top right) to keep your scan and plants online and plan the garden together. Each of you creates your own username and password. One of you creates the garden and gets an invite code. The other signs in and joins with that code.
+
+Usernames are stored as `<username>@users.garden-builder.invalid` in Supabase, so **Confirm email** must be turned off in the Supabase dashboard (Authentication → Sign In / Providers). There's no email, so a forgotten password is reset from the Supabase dashboard (Authentication → Users).
 
 - The scan is uploaded once to private storage and downloaded automatically on your partner's device.
 - Plants, notes, compass direction and scan orientation sync live: when your partner plants something, it appears on your screen.
@@ -51,7 +53,7 @@ python3 -m http.server 8765
 
 Then open <http://localhost:8765>.
 
-`tests/selftest.html` runs a quick self-check. It builds every plant in every season and loads generated PLY, splat and GLB scans. Open <http://localhost:8765/tests/selftest.html> and every line should say PASS.
+`tests/gallery.html` shows every plant side by side, by category and season. `tests/selftest.html` runs a quick self-check. It builds every plant in every season and loads generated PLY, splat and GLB scans. Open <http://localhost:8765/tests/selftest.html> and every line should say PASS.
 
 ## Hosting on GitHub Pages
 

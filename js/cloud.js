@@ -27,8 +27,34 @@ export function onAuth(callback) {
   sb.auth.onAuthStateChange((_event, session) => callback(session?.user ?? null));
 }
 
-export async function sendLink(email) {
-  must(await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } }));
+// Supabase accounts are keyed by email, so a username maps to an address on a reserved domain
+// (.invalid can never receive mail). With "Confirm email" turned off, no email is ever sent.
+const USER_DOMAIN = 'users.garden-builder.invalid';
+export const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,29}$/;
+const toEmail = (username) => `${username.trim().toLowerCase()}@${USER_DOMAIN}`;
+
+export function displayName(emailOrUser) {
+  const email = typeof emailOrUser === 'string' ? emailOrUser : emailOrUser?.email ?? '';
+  return email.endsWith(`@${USER_DOMAIN}`) ? email.slice(0, -USER_DOMAIN.length - 1) : email;
+}
+
+function friendly(err) {
+  const msg = err?.message ?? String(err);
+  if (/invalid login credentials/i.test(msg)) return new Error('Wrong username or password.');
+  if (/already registered|already exists/i.test(msg)) return new Error('That username is taken. Choose another, or sign in if it is yours.');
+  if (/email not confirmed/i.test(msg)) return new Error('Sign-in is waiting for email confirmation. Turn off "Confirm email" in Supabase (Authentication → Sign In / Providers).');
+  return err instanceof Error ? err : new Error(msg);
+}
+
+export async function signIn(username, password) {
+  const { error } = await sb.auth.signInWithPassword({ email: toEmail(username), password });
+  if (error) throw friendly(error);
+}
+
+export async function signUp(username, password) {
+  const { data, error } = await sb.auth.signUp({ email: toEmail(username), password, options: { data: { username } } });
+  if (error) throw friendly(error);
+  if (!data.session) throw friendly(new Error('email not confirmed'));
 }
 
 export async function signOut() {
