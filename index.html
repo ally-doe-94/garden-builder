@@ -38,6 +38,7 @@
         <button data-action="snapshot">Save picture (.png)</button>
         <hr />
         <button data-action="clear-plants" class="danger">Remove all plants</button>
+        <button data-action="clear-landscape" class="danger">Remove all landscaping</button>
         <button data-action="clear-scan" class="danger">Remove scan</button>
       </div>
     </div>
@@ -47,15 +48,29 @@
 
   <aside id="palette" class="panel left">
     <div class="panel-head">
-      <h2>Plants</h2>
+      <div class="tabs">
+        <button data-tab="plants" class="active">Plants</button>
+        <button data-tab="landscape">Landscaping</button>
+      </div>
       <button class="icon collapse" data-collapse="palette" title="Collapse">‹</button>
     </div>
-    <input id="plant-search" type="search" placeholder="Search plants…" />
-    <div id="plant-filters" class="chips"></div>
-    <div id="plant-grid" class="plant-grid"></div>
-    <div class="panel-section">
-      <h3>In this garden <span id="placed-count" class="muted"></span></h3>
-      <ul id="placed-list" class="placed-list"></ul>
+    <div id="tab-plants">
+      <input id="plant-search" type="search" placeholder="Search plants…" />
+      <div id="plant-filters" class="chips"></div>
+      <div id="plant-grid" class="plant-grid"></div>
+      <div class="panel-section">
+        <h3>In this garden <span id="placed-count" class="muted"></span></h3>
+        <ul id="placed-list" class="placed-list"></ul>
+      </div>
+    </div>
+    <div id="tab-landscape" class="hidden">
+      <p class="muted small tab-intro">Pick a tool, then click in the garden to draw it.</p>
+      <div id="landscape-tools" class="plant-grid"></div>
+      <div id="landscape-options" class="landscape-options hidden"></div>
+      <div class="panel-section">
+        <h3>Built <span id="feature-count" class="muted"></span></h3>
+        <ul id="feature-list" class="placed-list"></ul>
+      </div>
     </div>
   </aside>
 
@@ -83,6 +98,26 @@
       <button id="insp-dup">Duplicate</button>
       <button id="insp-del" class="danger">Delete</button>
     </div>
+  </aside>
+
+  <aside id="feature-panel" class="panel right hidden">
+    <div class="panel-head">
+      <h2 id="feat-title">Path</h2>
+      <button class="icon" id="feat-close" title="Deselect">✕</button>
+    </div>
+    <label>Material
+      <select id="feat-material"></select>
+    </label>
+    <label id="feat-width-row"><span id="feat-width-label">Width</span> <output id="feat-width-out"></output>
+      <input id="feat-width" type="range" />
+    </label>
+    <label id="feat-height-row"><span id="feat-height-label">Height</span> <output id="feat-height-out"></output>
+      <input id="feat-height" type="range" />
+    </label>
+    <label id="feat-curved-row" class="check"><input id="feat-curved" type="checkbox" /> Smooth curves</label>
+    <dl id="feat-facts" class="facts"></dl>
+    <p class="muted small">Drag the white dots to reshape it, or drag the feature itself to move it.</p>
+    <div class="tool-row"><button id="feat-del" class="danger">Delete</button></div>
   </aside>
 
   <aside id="scan-panel" class="panel right hidden">
@@ -158,6 +193,7 @@
       <ul>
         <li>Pick a plant on the left, then click/tap in the garden to plant it. Keep clicking to plant more; press <kbd>Esc</kbd> to stop.</li>
         <li>Click a plant to select it: move, rotate, resize, add notes.</li>
+        <li>Open the <em>Landscaping</em> tab to draw paths, paving, garden beds, retaining walls, fences and steps. Click points in the garden, then double-click or press <kbd>Enter</kbd> to finish. Hold <kbd>Shift</kbd> for neat angles. Click a feature to change its material or size, or drag its white dots to reshape it. It also tells you roughly how much material you'll need.</li>
         <li>Slide <em>Growth</em> to see how big things get over the years, and <em>Month</em>/<em>Time</em> to check sun, shade and the seasons.</li>
         <li>Everything is saved in this browser automatically. Use <em>⋯ → Save layout file</em> to back up or move to another device.</li>
       </ul>

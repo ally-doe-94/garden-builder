@@ -72,6 +72,40 @@ try {
   ok(true, 'lit/unlit toggle');
 } catch (e) { ok(false, `glb: ${e.stack}`); }
 
+// Every landscaping tool builds with every material, on flat ground and on a slope.
+const { TOOLS, buildFeature, featureStats } = await import('../js/landscape.js');
+const shapes = {
+  path: [[0, 0, 0], [3, 0, 1], [6, 0, -1], [8, 0, 2]],
+  area: [[0, 0, 0], [4, 0, 0], [4, 0, 3], [1, 0, 4]],
+  wall: [[0, 0, 0], [5, 0, 0], [7, 0, 3]],
+  steps: [[0, 0, 0], [0, 0.8, 2]],
+};
+for (const slope of [0, 0.15]) {
+  const ground = (x, z) => x * slope;
+  for (const tool of TOOLS) {
+    for (const material of tool.materials) {
+      const rec = { id: `t-${tool.id}-${material}`, kind: 'feature', type: tool.type, tool: tool.id, ...tool.defaults, material,
+        points: shapes[tool.type].map(([x, y, z]) => [x, y + ground(x, z), z]) };
+      if (tool.type === 'steps') rec.height = 0.8;
+      try {
+        const obj = buildFeature(rec, (x, z) => ground(x, z));
+        const box = new THREE.Box3().setFromObject(obj);
+        let tris = 0;
+        obj.traverse((o) => { if (o.isMesh) tris += (o.geometry.index ? o.geometry.index.count : o.geometry.attributes.position.count) / 3; });
+        const stats = featureStats(rec);
+        const ok = tris > 0 && !box.isEmpty() && Number.isFinite(box.max.y) && stats.length > 0 && stats.every(([, v]) => !/NaN|undefined/.test(v));
+        if (!ok) console.log(rec, box, stats);
+        log.push(`${ok ? 'PASS' : 'FAIL'} ${tool.id}/${material}${slope ? ' (slope)' : ''}: ${tris} tris, ${stats.map((r) => r[1]).join(' · ')}`);
+      } catch (e) { ok(false, `${tool.id}/${material}: ${e.stack}`); }
+    }
+  }
+}
+const stepsRec = { id: 's', kind: 'feature', type: 'steps', tool: 'steps', material: 'timber', width: 1, points: [[0, 0, 0], [0, 0.85, 1.6]], height: 0.85 };
+const stepStats = Object.fromEntries(featureStats(stepsRec));
+ok(stepStats.Steps === '5' && stepStats.Riser === '170 mm', `steps 0.85 m rise -> ${stepStats.Steps} steps of ${stepStats.Riser}`);
+const patio = { id: 'a', kind: 'feature', type: 'area', tool: 'area', material: 'pavers', points: [[0, 0, 0], [4, 0, 0], [4, 0, 3], [0, 0, 3]] };
+ok(featureStats(patio)[0][1] === '12.0 m²', `4 × 3 m patio area ${featureStats(patio)[0][1]}`);
+
 document.getElementById('out').textContent = log.join('\n');
 window.__done = log;
 </script></body></html>

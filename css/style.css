@@ -221,3 +221,21 @@ dialog p { line-height: 1.5; font-size: 14px; }
 @media (max-width: 760px) {
   .account #account-label { display: none; }
 }
+
+/* ---------- palette tabs & landscaping ---------- */
+.tabs { display: flex; gap: 4px; background: rgba(0, 0, 0, 0.25); border-radius: 9px; padding: 3px; }
+.tabs button { border: none; background: none; padding: 5px 10px; font-weight: 600; }
+.tabs button.active { background: rgba(123, 198, 126, 0.25); }
+.panel.collapsed .tabs button:not(.active) { display: none; }
+.tab-intro { margin: 0 0 8px; }
+.landscape-options { margin-top: 10px; border-top: 1px solid var(--border); }
+.material-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.material-chips button { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 9px; border-radius: 999px; }
+.material-chips i { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.4); flex: none; }
+.placed-list small { font-size: 11px; }
+.hint { display: flex; align-items: center; gap: 10px; }
+.hint-buttons { display: inline-flex; gap: 5px; }
+.hint-buttons button { padding: 4px 10px; font-size: 12px; }
+@media (max-width: 760px) {
+  .hint { flex-direction: column; gap: 6px; }
+}

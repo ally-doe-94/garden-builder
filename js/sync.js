@@ -10,7 +10,14 @@ import * as cloud from './cloud.js';
 const $ = (id) => document.getElementById(id);
 const round = (n) => Math.round(n * 10000) / 10000;
 
+// Plants and landscaping features share one list (the `plants` table); features carry kind: 'feature'.
 function toRecord(p) {
+  if (p.kind === 'feature') {
+    return {
+      id: p.id, kind: 'feature', type: p.type, tool: p.tool, material: p.material,
+      points: p.points.map((pt) => pt.map(round)), width: round(p.width ?? 0), height: round(p.height ?? 0), curved: !!p.curved,
+    };
+  }
   return {
     id: p.id, type: p.type, position: p.position.map(round), rotation: round(p.rotation), size: round(p.size),
     seed: p.seed, planted: p.planted, notes: p.notes ?? '',
@@ -25,6 +32,7 @@ const sharedSettings = (settings) => ({ lat: settings.lat, north: settings.north
 const message = (err) => err?.message || String(err);
 
 export function initSync(api) {
+  const items = () => [...api.state.plants, ...(api.state.features ?? [])];
   const s = {
     user: null, garden: null, ready: false, unsubscribe: null, needResync: false,
     synced: new Map(), lastSettings: '', lastTransform: '', scanPrefix: null,
@@ -57,23 +65,23 @@ export function initSync(api) {
 
     if (initial && remote.size === 0) {
       // A brand new shared garden: your existing plants move in, the sample plants don't.
-      for (const p of api.state.plants.filter((x) => x.demo)) api.removePlantLocal(p.id);
+      for (const p of api.state.plants.filter((x) => x.demo)) api.removeItemLocal(p.id);
       return;
     }
-    if (initial && api.state.plants.some((p) => !p.demo && !remote.has(p.id))) {
-      try { localStorage.setItem('garden-builder.local-backup', JSON.stringify(api.state.plants)); } catch { /* storage full */ }
+    if (initial && items().some((p) => !p.demo && !remote.has(p.id))) {
+      try { localStorage.setItem('garden-builder.local-backup', JSON.stringify(items())); } catch { /* storage full */ }
     }
 
-    for (const p of [...api.state.plants]) {
+    for (const p of items()) {
       if (remote.has(p.id)) continue;
-      if (initial && !s.synced.has(p.id)) api.removePlantLocal(p.id); // local-only plant not in the shared garden
-      else if (s.synced.has(p.id)) { s.synced.delete(p.id); api.removePlantLocal(p.id); } // deleted by your partner
+      if (initial && !s.synced.has(p.id)) api.removeItemLocal(p.id); // local-only item not in the shared garden
+      else if (s.synced.has(p.id)) { s.synced.delete(p.id); api.removeItemLocal(p.id); } // deleted by your partner
     }
     for (const [id, rec] of remote) {
       const key = canon(rec);
       if (s.synced.get(id) === key && !initial) continue;
       s.synced.set(id, key);
-      api.upsertRemotePlant(rec);
+      api.upsertRemoteItem(rec);
     }
   }
 
@@ -159,7 +167,7 @@ export function initSync(api) {
 
         const changed = [];
         const previous = new Map();
-        for (const p of api.state.plants) {
+        for (const p of items()) {
           const rec = toRecord(p);
           const key = canon(rec);
           if (s.synced.get(p.id) === key) continue;
@@ -167,7 +175,7 @@ export function initSync(api) {
           previous.set(p.id, s.synced.get(p.id));
           s.synced.set(p.id, key); // optimistic, so the realtime echo is ignored
         }
-        const present = new Set(api.state.plants.map((p) => p.id));
+        const present = new Set(items().map((p) => p.id));
         const removed = [...s.synced.keys()].filter((id) => !present.has(id));
 
         try {
@@ -273,14 +281,14 @@ export function initSync(api) {
         if (payload.eventType === 'DELETE') {
           const id = payload.old.id;
           s.synced.delete(id);
-          api.removePlantLocal(id);
+          api.removeItemLocal(id);
           return;
         }
         const rec = toRecord(payload.new.data);
         const key = canon(rec);
         if (s.synced.get(rec.id) === key) return; // our own change coming back
         s.synced.set(rec.id, key);
-        api.upsertRemotePlant(rec);
+        api.upsertRemoteItem(rec);
       },
       onState: (payload) => {
         if (payload.eventType === 'DELETE') return;

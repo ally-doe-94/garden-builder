@@ -10,6 +10,7 @@ import {
   loadScan, createScanRig, guessOrientation, applyScanTransform, setScanLit, setPointSize, disposeScan,
 } from './scan.js';
 import * as store from './storage.js';
+import { createLandscapeEditor } from './landscapeEditor.js';
 
 const $ = (id) => document.getElementById(id);
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -24,6 +25,7 @@ const DEFAULT_SETTINGS = { years: 0, month: 6, hour: 14, lat: 51.5, north: 0, sh
 const saved = store.loadState();
 const state = {
   plants: saved?.plants ?? [],
+  features: saved?.features ?? [], // landscaping: paths, paving, walls, fences, steps (see landscape.js)
   settings: { ...DEFAULT_SETTINGS, ...saved?.settings },
   scan: saved?.scan ?? null, // transform settings for the loaded scan; files live in IndexedDB
 };
@@ -95,6 +97,7 @@ scene.add(transform.getHelper());
 let terrain = null;        // demo garden group or scan rig
 let terrainTargets = [];   // meshes / points used to find the ground under the cursor
 let demo = null;
+let landscape = null;      // landscaping editor, created once raycasting is set up below
 const plantObjects = new Map();
 
 addEventListener('resize', () => {
@@ -115,6 +118,7 @@ function setTerrain(obj, targets, bounds) {
   terrain = obj;
   terrainTargets = targets;
   scene.add(obj);
+  landscape?.rebuildAll();
   env.fit(bounds);
   env.setSun(state.settings);
   frameCamera(bounds);
@@ -139,6 +143,8 @@ function frameCamera(box) {
   controls.minDistance = 0.3;
   controls.update();
 }
+
+let focusTarget = null;
 
 const formatCount = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : `${n}`);
 
@@ -189,6 +195,7 @@ function refreshScan() {
   const bounds = applyScanTransform(terrain, state.scan);
   env.fit(bounds);
   env.setSun(state.settings);
+  landscape?.rebuildAll();
   persist();
 }
 
@@ -220,14 +227,42 @@ function groundHeightAt(x, z, nearY) {
   return hits.reduce((best, h) => (Math.abs(h.point.y - nearY) < Math.abs(best - nearY) ? h.point.y : best), hits[0].point.y);
 }
 
+// Plants stand on paving, decks and beds as well as the ground itself.
+function hitSurface() {
+  const hit = raycaster.intersectObjects([...terrainTargets, ...landscape.meshes()], false)[0]
+    ?? raycaster.intersectObject(env.groundPlane, false)[0];
+  return hit?.point ?? null;
+}
+
+function surfaceHeightAt(x, z, nearY) {
+  raycaster.set(new THREE.Vector3(x, nearY + 3, z), DOWN);
+  const hits = raycaster.intersectObjects([...terrainTargets, ...landscape.meshes()], false);
+  if (!hits.length) return nearY;
+  return hits.reduce((best, h) => (Math.abs(h.point.y - nearY) < Math.abs(best - nearY) ? h.point.y : best), hits[0].point.y);
+}
+
 function pickPlant() {
   for (const hit of raycaster.intersectObject(plantsGroup, true)) {
     let o = hit.object;
     while (o && !o.userData.plantId) o = o.parent;
-    if (o) return o.userData.plantId;
+    if (o) return { id: o.userData.plantId, distance: hit.distance };
   }
   return null;
 }
+
+landscape = createLandscapeEditor({
+  scene, controls, canvas: renderer.domElement, raycaster, setRayFromEvent, hitTerrain, groundHeightAt, state,
+  persist: () => persist(),
+  toast: (msg) => toast(msg),
+  showHint: (html) => showHint(html),
+  hideHint: () => hideHint(),
+  focusOn: (point) => { focusTarget = point.clone(); },
+  clearPlantSelection: () => select(null),
+  beforeDrawing: () => { stopPlacing(); select(null); },
+});
+
+// For debugging in the browser console and for tests/: inspect the scene and data.
+window.__garden = { scene, state, landscape, camera, controls };
 
 // ---------------------------------------------------------------------------
 // Plants
@@ -311,6 +346,8 @@ function startPlacing(id) {
   if (placing?.id === id) return stopPlacing();
   stopPlacing();
   select(null);
+  landscape.cancelDrawing();
+  landscape.select(null);
   placing = PLANT_BY_ID[id];
   ghost = createPlant(id, 12345);
   ghost.traverse((o) => {
@@ -347,7 +384,7 @@ function updateGhost() {
   ghostQueued = false;
   if (!ghost || !lastPointer) return;
   setRayFromEvent(lastPointer);
-  const p = hitTerrain();
+  const p = hitSurface();
   ghost.visible = !!p;
   if (p) ghost.position.copy(p);
 }
@@ -363,6 +400,7 @@ function select(id) {
   const prev = selectedId && plantObjects.get(selectedId);
   if (prev) prev.userData.selectRing.visible = false;
   selectedId = id;
+  if (id) landscape.select(null);
   if (!id) {
     transform.detach();
     $('inspector').classList.add('hidden');
@@ -391,7 +429,7 @@ function setTool(t) {
 transform.addEventListener('objectChange', () => {
   const obj = transform.object;
   if (!obj) return;
-  if (tool === 'translate') obj.position.y = groundHeightAt(obj.position.x, obj.position.z, obj.position.y);
+  if (tool === 'translate') obj.position.y = surfaceHeightAt(obj.position.x, obj.position.z, obj.position.y);
   syncRecordFromObject(obj.userData.plantId);
 });
 
@@ -433,12 +471,11 @@ function duplicateSelected() {
   const offset = new THREE.Vector3(Math.max(0.3, def.spread * growthScale(def, displayAge(rec)) * rec.size), 0, 0)
     .applyAxisAngle(new THREE.Vector3(0, 1, 0), obj.rotation.y);
   const pos = obj.position.clone().add(offset);
-  pos.y = groundHeightAt(pos.x, pos.z, pos.y);
+  pos.y = surfaceHeightAt(pos.x, pos.z, pos.y);
   const copy = addPlant(rec.type, pos, { rotation: rec.rotation, size: rec.size, planted: rec.planted });
   select(copy.id);
 }
 
-let focusTarget = null;
 function focusOn(obj) {
   focusTarget = obj.position.clone();
 }
@@ -451,24 +488,35 @@ let down = null;
 const canvas = renderer.domElement;
 
 canvas.addEventListener('pointerdown', (e) => {
-  down = { x: e.clientX, y: e.clientY, button: e.button, onGizmo: transform.axis !== null || transform.dragging };
+  const onGizmo = transform.axis !== null || transform.dragging;
+  down = { x: e.clientX, y: e.clientY, button: e.button, onGizmo };
+  if (!onGizmo && !placing) landscape.onPointerDown(e);
 });
 
 canvas.addEventListener('pointerup', (e) => {
   if (!down) return;
   const click = Math.hypot(e.clientX - down.x, e.clientY - down.y) < 6 && !down.onGizmo && down.button === 0;
   down = null;
+  if (landscape.onPointerUp(e, click)) return;
   if (!click) return;
   setRayFromEvent(e);
   if (placing) {
-    const p = hitTerrain();
+    const p = hitSurface();
     if (p) addPlant(placing.id, p);
     return;
   }
-  select(pickPlant());
+  // Whichever is nearer the camera wins: a plant or a piece of landscaping.
+  const plant = pickPlant();
+  const feature = landscape.pick();
+  if (feature && (!plant || feature.distance < plant.distance)) landscape.select(feature.id);
+  else {
+    select(plant?.id ?? null);
+    if (!plant) landscape.select(null);
+  }
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  if (landscape.onPointerMove(e)) return;
   if (!placing || e.pointerType === 'touch') return;
   lastPointer = e;
   if (!ghostQueued) {
@@ -486,6 +534,7 @@ canvas.addEventListener('contextmenu', (e) => {
 
 addEventListener('keydown', (e) => {
   if (e.target.closest('input, textarea, select')) return;
+  if (!placing && !selectedId && landscape.onKey(e)) return;
   if (e.key === 'Escape') {
     if (placing) stopPlacing();
     else select(null);
@@ -562,6 +611,14 @@ $('placed-list').addEventListener('click', (e) => {
   select(next);
   focusOn(plantObjects.get(next));
 });
+document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('active', x === b));
+  $('tab-plants').classList.toggle('hidden', b.dataset.tab !== 'plants');
+  $('tab-landscape').classList.toggle('hidden', b.dataset.tab !== 'landscape');
+  $('palette').classList.remove('collapsed');
+  if (b.dataset.tab === 'plants') landscape.cancelDrawing();
+  else stopPlacing();
+}));
 document.querySelectorAll('[data-collapse]').forEach((b) =>
   b.addEventListener('click', () => $(b.dataset.collapse).classList.toggle('collapsed')));
 
@@ -729,6 +786,7 @@ function importLayout(text) {
     return;
   }
   for (const id of [...plantObjects.keys()]) removePlant(id);
+  landscape.clearAll();
   state.settings = { ...DEFAULT_SETTINGS, ...data.settings };
   if (data.scan && state.scan && data.scan.name === state.scan.name) {
     state.scan = { ...DEFAULT_SCAN, ...data.scan };
@@ -741,6 +799,9 @@ function importLayout(text) {
     state.plants.push(clean);
     spawnPlant(clean);
   }
+  for (const rec of data.features ?? []) {
+    if (rec.kind === 'feature' && Array.isArray(rec.points)) landscape.upsertRemote({ ...rec });
+  }
   for (const key of ['years', 'month', 'hour', 'lat', 'north']) $(key).value = state.settings[key];
   $('show-spread').checked = state.settings.showSpread;
   currentSeason = null;
@@ -748,7 +809,7 @@ function importLayout(text) {
   updateAllPlants({ age: true, spread: true });
   renderPlacedList();
   persist();
-  toast(`Opened layout with ${state.plants.length} plants.`);
+  toast(`Opened layout with ${state.plants.length} plants and ${state.features.length} landscaping features.`);
 }
 
 function exportLayout() {
@@ -758,7 +819,7 @@ function exportLayout() {
 
 // Hide helpers (gizmo, rings, ghost) while running fn.
 function withoutHelpers(fn) {
-  const hidden = [transform.getHelper(), ghost, env.grid, env.compass].filter((o) => o?.visible);
+  const hidden = [transform.getHelper(), ghost, env.grid, env.compass, landscape.helpers].filter((o) => o?.visible);
   const rings = [];
   for (const obj of plantObjects.values()) {
     for (const r of [obj.userData.spreadRing, obj.userData.selectRing]) if (r.visible) rings.push(r);
@@ -786,7 +847,9 @@ async function exportGLB() {
     for (const obj of plantObjects.values()) {
       for (const r of [obj.userData.spreadRing, obj.userData.selectRing]) if (r.visible) { r.visible = false; hiddenRings.push(r); }
     }
-    const result = await exporter.parseAsync([terrain, plantsGroup], { binary: true, onlyVisible: true });
+    landscape.helpers.visible = false;
+    const result = await exporter.parseAsync([terrain, landscape.group, plantsGroup], { binary: true, onlyVisible: true });
+    landscape.helpers.visible = true;
     hiddenRings.forEach((r) => { r.visible = true; });
     store.downloadBlob(new Blob([result], { type: 'model/gltf-binary' }), `garden-${today()}.glb`);
   } catch (err) {
@@ -814,6 +877,9 @@ $('menu').addEventListener('click', async (e) => {
   if (action === 'snapshot') snapshot();
   if (action === 'clear-plants' && state.plants.length && confirm(`Remove all ${state.plants.length} plants?`)) {
     for (const id of [...plantObjects.keys()]) removePlant(id);
+  }
+  if (action === 'clear-landscape' && state.features.length && confirm(`Remove all ${state.features.length} landscaping features?`)) {
+    landscape.clearAll();
   }
   if (action === 'clear-scan' && state.scan && confirm('Remove the scan and go back to the demo garden? Your plants stay.')) {
     await clearScanLocal();
@@ -911,8 +977,9 @@ function upsertRemotePlant(rec) {
 const syncApi = {
   state, toast, showLoading, hideLoading,
   setLoadingText: (text) => { $('loading-text').textContent = text; },
-  removePlantLocal: (id) => removePlant(id),
-  upsertRemotePlant, adoptScan, clearScanLocal, applyTransform, syncSettingsUI,
+  removeItemLocal: (id) => (state.features.some((f) => f.id === id) ? landscape.removeLocal(id) : removePlant(id)),
+  upsertRemoteItem: (rec) => (rec.kind === 'feature' ? landscape.upsertRemote(rec) : upsertRemotePlant(rec)),
+  adoptScan, clearScanLocal, applyTransform, syncSettingsUI,
   getLocalScanFiles: () => store.loadScanFiles(),
   saveLocal: () => store.saveState(state),
 };
@@ -965,6 +1032,7 @@ function animate() {
     if (d.lengthSq() < 1e-6) focusTarget = null;
   }
   controls.update();
+  landscape.update(camera);
   renderer.render(scene, camera);
 }
 
@@ -985,6 +1053,7 @@ async function start() {
   }
 
   for (const rec of state.plants) spawnPlant(rec);
+  landscape.spawnAll();
   if (!saved) {
     if (!hasAccount()) plantDemoExamples();
     showHint('Pick a plant on the left, then click in the garden to plant it');

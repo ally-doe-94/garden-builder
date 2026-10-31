@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Landscaping Test</title>
+<style>
+  body { margin: 0; background: #a7cbe3; font-family: system-ui, sans-serif; }
+  #label { position: fixed; bottom: 10px; left: 10px; background: #fffd; padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<div id="label">Every landscaping tool on the demo garden. Drag to orbit. window.__view(x, z, dist, fromBack) to look somewhere.</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { createEnvironment, createDemoGarden } from '../js/environment.js';
+import { buildFeature } from '../js/landscape.js';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+const env = createEnvironment(scene);
+const demo = createDemoGarden();
+scene.add(demo);
+env.fit(new THREE.Box3().setFromObject(demo));
+env.setSun({ lat: -36.9, month: 1, hour: 15, north: 0 });
+const camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.05, 500);
+const controls = new OrbitControls(camera, renderer.domElement);
+
+const targets = [];
+demo.traverse((o) => { if (o.isMesh) targets.push(o); });
+const ray = new THREE.Raycaster();
+const heightNear = (x, z, nearY) => {
+  ray.set(new THREE.Vector3(x, nearY + 3, z), new THREE.Vector3(0, -1, 0));
+  const hits = ray.intersectObjects(targets, false);
+  if (!hits.length) return nearY;
+  return hits.reduce((best, h) => (Math.abs(h.point.y - nearY) < Math.abs(best - nearY) ? h.point.y : best), hits[0].point.y);
+};
+
+// Demo garden: 9 m × 14 m, house at +z. A little of everything.
+const features = [
+  { tool: 'path', type: 'path', material: 'gravel', width: 1, curved: true, points: [[0.6, 0, 3.3], [1.2, 0, 0.5], [0.2, 0, -2], [0.8, 0, -4.5]] },
+  { tool: 'path', type: 'path', material: 'stepping', width: 0.8, curved: true, points: [[-2, 0, 2.5], [-1, 0, 1], [-2, 0, -1]] },
+  { tool: 'area', type: 'area', material: 'decking', points: [[1.2, 0, 4.4], [4.3, 0, 4.4], [4.3, 0, 6.9], [1.2, 0, 6.9]] },
+  { tool: 'area', type: 'area', material: 'brick', points: [[-4.3, 0, -2.6], [-2.8, 0, -2.6], [-2.8, 0, -4.4], [-4.3, 0, -4.4]] },
+  { tool: 'bed', type: 'area', material: 'soil', curved: true, points: [[2.6, 0, 0.8], [3.9, 0, 0.6], [3.9, 0, -2.2], [2.8, 0, -1.6]] },
+  { tool: 'bed', type: 'area', material: 'scoria', curved: true, points: [[-1.6, 0, -3.2], [-0.4, 0, -3.4], [-0.6, 0, -4.6], [-1.8, 0, -4.4]] },
+  { tool: 'wall', type: 'wall', material: 'sleeper', height: 0.6, points: [[-4.3, 0, -5.2], [0, 0, -5.2]] },
+  { tool: 'wall', type: 'wall', material: 'stone', height: 0.5, curved: true, points: [[1.2, 0, -5.1], [2.2, 0, -4.6], [3.1, 0, -4.9]] },
+  { tool: 'wall', type: 'wall', material: 'gabion', height: 1, points: [[-4.3, 0, 1.6], [-4.3, 0, 0.1]] },
+  { tool: 'wall', type: 'wall', material: 'corten', height: 0.45, points: [[2.5, 0, 2.2], [4, 0, 2.2]] },
+  { tool: 'fence', type: 'wall', material: 'paling', height: 1.8, points: [[-4.45, 0, 4], [-4.45, 0, 2]] },
+  { tool: 'steps', type: 'steps', material: 'timber', width: 1.2, height: 0.2, points: [[2.7, 0, 3.6], [2.7, 0.2, 4.4]] },
+  { tool: 'steps', type: 'steps', material: 'stone', width: 1, height: 0.8, points: [[-1.5, 0, -5.9], [-1.5, 0.8, -7]] },
+];
+features.forEach((f, i) => {
+  const rec = { id: `f${i}`, kind: 'feature', width: 0, height: 0, curved: false, ...f };
+  rec.points = rec.points.map(([x, y, z]) => [x, heightNear(x, z, y), z]);
+  scene.add(buildFeature(rec, heightNear));
+});
+
+window.__view = (x = 0, z = 0, dist = 14, fromBack = false) => {
+  controls.target.set(x, 0, z);
+  camera.position.set(x + dist * 0.35, dist * 0.8, z + (fromBack ? -1 : 1) * dist * 0.7);
+  controls.update();
+};
+window.__view(0, 0, 16);
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+window.__ready = true;
+</script>
+</body>
+</html>

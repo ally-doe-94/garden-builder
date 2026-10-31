@@ -24,6 +24,23 @@ There's no build step and nothing to install. It's plain HTML, CSS and ES module
 - **Export** a `.png` picture or the whole scene as a `.glb` (scan plus plants).
 - Works on desktop and on phones/tablets (touch to orbit, tap to plant).
 
+## Landscaping
+
+Open the **Landscaping** tab to build hard landscaping into the garden:
+
+| Tool | How to draw it | Materials |
+|---|---|---|
+| Path | click along the route (smooth curves optional) | gravel, red scoria, bark, concrete pavers, clay brick, flagstone, exposed aggregate, decking boardwalk, stepping stones |
+| Paving & patio | click each corner | pavers, brick, flagstone, exposed aggregate, raised timber deck, gravel, scoria |
+| Garden bed / lawn | click around the edge | mulched soil, bark, lawn, gravel, scoria |
+| Retaining wall | click along the line | H4 sleepers, concrete block, dry-stacked stone, gabion baskets, brick, corten steel |
+| Fence | click along the line | timber paling |
+| Steps | click the bottom, then the top | timber, concrete, stone, brick, sleeper & gravel |
+
+To finish, double-click, press <kbd>Enter</kbd> or tap **Finish**. For areas, you can also click the first corner again. Hold <kbd>Shift</kbd> to keep lines at 15° angles. Click a feature to change its material, width or height, drag its white dots to reshape it, or drag the feature to move it.
+
+Each feature shows its length or area, plus a rough shopping list: pavers or bricks (with spare), sleepers and posts, m³ of gravel or concrete, and step riser and tread sizes. Plants can be placed on top of paving, decks and beds. `tests/landscape.html` shows every tool on the demo garden.
+
 ## Sharing with a partner
 
 Sign in (top right) to keep your scan and plants online and plan the garden together. One of you creates the garden and gets an invite code; the other signs in and joins with that code.
@@ -85,6 +102,8 @@ Scans are never uploaded anywhere. They stay in your own browser.
 | `js/storage.js` | localStorage + IndexedDB persistence, downloads |
 | `js/cloud.js` | Supabase client: sign-in, gardens, plants, scan files |
 | `js/sync.js` | Sign-in dialog and live syncing with your partner |
+| `js/landscape.js` | Landscaping materials, textures, shapes and quantities |
+| `js/landscapeEditor.js` | Drawing, selecting and reshaping landscaping |
 | `supabase/schema.sql` | Database tables, access rules and storage setup |
 
 ### Adding a plant
