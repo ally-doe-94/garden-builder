@@ -21,9 +21,15 @@ There's no build step and nothing to install. It's plain HTML, CSS and ES module
 
 ## Sharing with a partner
 
-Sign in (top right) to keep your scan and plants online and plan the garden together. Each of you creates your own username and password. One of you creates the garden and gets an invite code. The other signs in and joins with that code.
+Sign in (top right) to keep your scan and plants online and plan the garden together. One of you creates the garden and gets an invite code; the other signs in and joins with that code.
 
-Usernames are stored as `<username>@users.garden-builder.invalid` in Supabase, so **Confirm email** must be turned off in the Supabase dashboard (Authentication → Sign In / Providers). There's no email, so a forgotten password is reset from the Supabase dashboard (Authentication → Users).
+Accounts are created by hand in the Supabase dashboard, so there's no email or sign-up step. Go to **Authentication → Users → Add user → Create new user** and enter:
+
+- Email: `<username>@users.garden-builder.invalid` (for example `ally@users.garden-builder.invalid`). The `.invalid` domain can never receive mail.
+- Password: the person's password.
+- Tick **Auto Confirm User**.
+
+People then sign in with just their username (`Ally`, any capitalisation) and password. To change a password, use **Authentication → Users** in Supabase. You can also turn off **Allow new users to sign up** (Authentication → Sign In / Providers), so nobody else can create accounts.
 
 - The scan is uploaded once to private storage and downloaded automatically on your partner's device.
 - Plants, notes, compass direction and scan orientation sync live: when your partner plants something, it appears on your screen.

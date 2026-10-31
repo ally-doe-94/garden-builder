@@ -30,12 +30,32 @@ export function onAuth(callback) {
 // Supabase accounts are keyed by email, so a username maps to an address on a reserved domain
 // (.invalid can never receive mail). With "Confirm email" turned off, no email is ever sent.
 const USER_DOMAIN = 'users.garden-builder.invalid';
-export const USERNAME_PATTERN = /^[a-z0-9][a-z0-9._-]{2,29}$/;
-const toEmail = (username) => `${username.trim().toLowerCase()}@${USER_DOMAIN}`;
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// "Ally Doe" -> "ally.doe", "Kōwhai" -> "kowhai". An email address is used as typed.
+export function normaliseUsername(input) {
+  const t = input.trim().toLowerCase();
+  if (t.includes('@')) return t;
+  return t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '.').replace(/[^a-z0-9._-]/g, '').slice(0, 30);
+}
+export const isValidUsername = (u) => EMAIL.test(u) || /^[a-z0-9][a-z0-9._-]{2,29}$/.test(u);
+const toEmail = (username) => (username.includes('@') ? username : `${username}@${USER_DOMAIN}`);
+
+// With "Confirm email" on, Supabase would try to mail the made-up address, so don't sign up at all.
+async function confirmationOff() {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } });
+    return (await r.json()).mailer_autoconfirm === true;
+  } catch {
+    return true;
+  }
+}
 
 export function displayName(emailOrUser) {
   const email = typeof emailOrUser === 'string' ? emailOrUser : emailOrUser?.email ?? '';
-  return email.endsWith(`@${USER_DOMAIN}`) ? email.slice(0, -USER_DOMAIN.length - 1) : email;
+  if (!email.endsWith(`@${USER_DOMAIN}`)) return email;
+  const name = email.slice(0, -USER_DOMAIN.length - 1);
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 function friendly(err) {
@@ -52,6 +72,9 @@ export async function signIn(username, password) {
 }
 
 export async function signUp(username, password) {
+  if (!username.includes('@') && !(await confirmationOff())) {
+    throw new Error('Creating accounts is waiting on one Supabase setting: turn off "Confirm email" under Authentication → Sign In / Providers, then try again.');
+  }
   const { data, error } = await sb.auth.signUp({ email: toEmail(username), password, options: { data: { username } } });
   if (error) throw friendly(error);
   if (!data.session) throw friendly(new Error('email not confirmed'));

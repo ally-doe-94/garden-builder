@@ -367,12 +367,10 @@ export function initSync(api) {
   $('account-close').addEventListener('click', closeDialog);
 
   function credentials() {
-    const username = $('auth-user').value.trim().toLowerCase();
+    const username = cloud.normaliseUsername($('auth-user').value);
     const password = $('auth-pass').value;
-    if (!cloud.USERNAME_PATTERN.test(username)) {
-      throw new Error('Usernames are 3–30 letters or numbers (dots, dashes and underscores are fine too).');
-    }
-    if (password.length < 6) throw new Error('Passwords need at least 6 characters.');
+    if (!cloud.isValidUsername(username)) throw new Error('Enter your username.');
+    if (!password) throw new Error('Enter your password.');
     return [username, password];
   }
   async function authenticate(button, action) {
@@ -391,7 +389,6 @@ export function initSync(api) {
     e.preventDefault();
     authenticate($('auth-signin'), cloud.signIn);
   });
-  $('auth-signup').addEventListener('click', () => authenticate($('auth-signup'), cloud.signUp));
 
   $('garden-create').addEventListener('click', () => run($('garden-create'), async () => {
     s.garden = await cloud.createGarden($('new-garden-name').value);
