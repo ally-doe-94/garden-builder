@@ -688,7 +688,7 @@ export const PLANTS = [
 
   {
     id: 'kanuka', name: 'Kānuka', latin: 'Kunzea ericoides', emoji: '🤍', category: NZ,
-    height: 8, spread: 4, mature: 15, start: 0.15, sun: 'Full sun', type: 'NZ native tree, stringy bark, soft fine foliage',
+    height: 8, spread: 4, mature: 15, start: 0.15, sun: 'Full sun', type: 'NZ native tea tree, stringy bark, soft fine foliage',
     winter: 'keep', bloom: ['summer'], bloomText: 'Dec–Jan (clusters of small white flowers)',
     build(b) {
       const { rng } = b;

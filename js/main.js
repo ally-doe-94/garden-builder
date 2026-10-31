@@ -506,6 +506,8 @@ const SUN_SHORT = {
   'Full sun': '☀ sun', 'Full sun / part shade': '☀ sun–part', 'Sun / part shade': '☀ sun–part',
   'Part shade': '⛅ part shade', 'Part shade / shade': '☁ shade', 'Sun or shade': '◐ any',
 };
+// Case- and macron-insensitive, so "manuka" finds Mānuka.
+const fold = (text) => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 let filter = 'All';
 let search = '';
 
@@ -516,9 +518,9 @@ function renderFilters() {
 }
 
 function renderPalette() {
-  const q = search.trim().toLowerCase();
+  const q = fold(search.trim());
   const items = PLANTS.filter((p) => (filter === 'All' || p.category === filter)
-    && (!q || `${p.name} ${p.latin} ${p.type}`.toLowerCase().includes(q)));
+    && (!q || fold(`${p.name} ${p.latin} ${p.type}`).includes(q)));
   $('plant-grid').innerHTML = items.map((p) => `
     <button class="plant-card ${placing?.id === p.id ? 'active' : ''}" data-plant="${p.id}" title="${p.latin}">
       <span class="swatch">${p.emoji}</span>
