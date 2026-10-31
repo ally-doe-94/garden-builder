@@ -1,4 +1,4 @@
-# Northall Road Garden
+# Garden Builder
 
 A 3D garden planner that runs in the browser. Scan your garden with your phone, load the scan, then plant trees, shrubs and flowers in it. You can watch them grow over the years, change with the seasons, and see where the sun and shade fall.
 
@@ -43,7 +43,7 @@ Then open <http://localhost:8765>.
 
 ## Hosting on GitHub Pages
 
-Repository **Settings → Pages → Build and deployment → Deploy from a branch → `main` / `(root)`**. The app will be at `https://<user>.github.io/northall-road-garden/`.
+Repository **Settings → Pages → Build and deployment → Deploy from a branch → `main` / `(root)`**. The app will be at `https://<user>.github.io/garden-builder/`.
 
 Scans are never uploaded anywhere. They stay in your own browser.
 

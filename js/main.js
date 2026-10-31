@@ -747,7 +747,7 @@ function importLayout(text) {
 }
 
 function exportLayout() {
-  const data = { app: 'northall-road-garden', version: 1, exportedAt: new Date().toISOString(), ...state };
+  const data = { app: 'garden-builder', version: 1, exportedAt: new Date().toISOString(), ...state };
   store.downloadBlob(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), `garden-layout-${today()}.json`);
 }
 
